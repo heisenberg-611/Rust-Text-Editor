@@ -1,7 +1,7 @@
 # Text Editor in Rust
 
 A modal text editor inspired by Neovim, built with Rust.
-
+![Screenshot of editor](https://i.imgur.com/WVURAPQ.jpeg)
 ## Features
 
 - **Modal Editing**: Normal, Insert, Command, and **Visual** modes.
