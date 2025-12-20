@@ -56,21 +56,26 @@ selection_bg = "#3e4451"
 ## Keybindings
 
 ### Normal Mode
-- `h`, `j`, `k`, `l`: Move cursor Left, Down, Up, Right.
+- `h`, `j`, `k`, `l` or **Arrow Keys**: Move cursor Left, Down, Up, Right.
 - `i`: Enter Insert Mode.
 - `v`: Enter Visual Mode.
 - `x`: Delete character under cursor.
 - `p`: Paste from system clipboard.
+- `/`: Enter Search Mode.
+- `n` / `N`: Next / Previous search match.
 - `:`; Enter Command Mode.
 
 ### Insert Mode
 - `Esc`: Return to Normal Mode.
+- **Arrow Keys**: Navigate while typing.
+- **Backspace**: Delete characters (merges lines if at start).
 - Type normal characters to insert them.
 
 ### Visual Mode
-- Move cursor to select text.
+- Move cursor or **Arrow Keys** to select text.
 - `y`: Yank (Copy) selection to system clipboard.
-- `d` / `x`: Cut selection to system clipboard.
+- `d`: Delete selection.
+- `x`: Cut selection (Copy to clipboard and delete).
 - `Esc`: Return to Normal Mode.
 
 ### Command Mode

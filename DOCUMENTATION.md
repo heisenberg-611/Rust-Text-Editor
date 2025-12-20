@@ -48,19 +48,21 @@ Meow is a **modal** editor. This means keys behave differently depending on the 
 ### Keybindings Cheat Sheet
 
 #### Navigation (Normal Mode)
--   `h`, `j`, `k`, `l`: Left, Down, Up, Right
+-   `h`, `j`, `k`, `l` or **Arrow Keys**: Left, Down, Up, Right
 -   `Mouse Click`: Move cursor to position.
 
 #### Editing
 -   `i`: Enter Insert Mode.
 -   `x`: Delete character at cursor.
 -   `p`: Paste from clipboard.
+-   `Backspace`: Deletes characters. If cursor is at the start of a line, it merges the line with the previous one.
 
 #### Visual Mode (Selection)
 -   `v`: Start Visual Mode.
--   `h`/`j`/`k`/`l`: Extend selection.
+-   `h`/`j`/`k`/`l` or **Arrow Keys**: Extend selection.
 -   `y`: **Yank** (Copy) selected text to clipboard.
--   `d` or `x`: **Cut** selected text to clipboard.
+-   `d`: **Delete** selected text (no clipboard).
+-   `x`: **Cut** selected text to clipboard.
 
 #### Search
 -   `/`: Enter Search Mode.
@@ -90,9 +92,15 @@ mouse_support = true
 # Hex color codes (RRGGBB)
 background = "#282c34"   # Main editor background
 foreground = "#abb2bf"   # Default text color
-cursor = "#528bff"       # Cursor color (not yet fully rendered)
+cursor = "#528bff"       # Cursor color
 selection_bg = "#3e4451" # Background color for selected text
 ```
+
+### Status Bar Info
+-   **Mode Indicator**: Shows current editor mode.
+-   **File Info**: Displays filename, line count, and **total byte size**.
+-   **Save Feedback**: On `:w`, displays the number of bytes written.
+-   **Dynamic Status**: Messages like "Yanked!" appear temporarily and clear after 5 seconds or upon next action.
 
 ---
 
