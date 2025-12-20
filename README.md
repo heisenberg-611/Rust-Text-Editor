@@ -30,6 +30,10 @@ A modal text editor inspired by Neovim, built with Rust.
    cargo install --path .
    ```
    This will install the `meow` binary to your `~/.cargo/bin` folder.
+   You need to run this to add `meow` binary
+   ```bash
+   export PATH="$HOME/.cargo/bin:$PATH"
+   ```
 4. **Run**:
    ```bash
    meow filename.txt
