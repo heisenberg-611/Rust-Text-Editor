@@ -45,7 +45,6 @@ pub struct Editor {
     offset: Position,
     document: Document,
     status_message: String,
-    #[allow(dead_code)]
     status_time: Instant,
     mode: Mode,
     selection_start: Option<Position>,
@@ -247,7 +246,7 @@ impl Editor {
                 Mode::Visual => "VISUAL",
                 Mode::Search => "SEARCH",
             };
-            let status_text = format!(" {} | {} | Lines: {}", mode_str, filename, doc_len);
+            let status_text = format!(" {} | {} | Lines: {} | Bytes: {}", mode_str, filename, doc_len, self.document.size_bytes());
             let status_bar = Paragraph::new(status_text)
                 .style(Style::default().bg(parse_hex_color(&self.config.theme.selection_bg)).fg(parse_hex_color(&self.config.theme.foreground)));
             f.render_widget(status_bar, chunks[1]);
@@ -256,7 +255,13 @@ impl Editor {
             let cmd_text = match mode {
                 Mode::Command => format!(":{}", command_buf),
                 Mode::Search => format!("/{}", command_buf),
-                _ => status_msg,
+                _ => {
+                    if status_msg.is_empty() || Instant::now().duration_since(self.status_time) > Duration::from_secs(5) {
+                        String::new()
+                    } else {
+                        status_msg
+                    }
+                },
             };
             
             f.render_widget(Paragraph::new(cmd_text), chunks[2]);
@@ -351,7 +356,7 @@ impl Editor {
                 }
                 self.mode = Mode::Normal;
                 self.selection_start = None;
-                self.status_message = "Yanked!".to_string();
+                self.set_status_message("Yanked!".to_string());
             }
             KeyCode::Char('d') | KeyCode::Char('x') => {
                  if let Some(start) = self.selection_start {
@@ -370,7 +375,7 @@ impl Editor {
                 }
                 self.mode = Mode::Normal;
                 self.selection_start = None;
-                self.status_message = "Cut!".to_string();
+                self.set_status_message("Cut!".to_string());
             }
             _ => {}
         }
@@ -518,9 +523,9 @@ impl Editor {
         if let Some(pos) = self.document.find(query, &start_pos, direction) {
             self.move_cursor_absolute(pos.x, pos.y);
             self.selection_start = None; // clear selection if any
-            self.status_message = String::new();
+            self.set_status_message(String::new());
         } else {
-            self.status_message = format!("Pattern not found: {}", query);
+            self.set_status_message(format!("Pattern not found: {}", query));
         }
     }
 
@@ -530,16 +535,21 @@ impl Editor {
             self.should_quit = true;
         } else if cmd == "w" {
             if let Err(e) = self.document.save() {
-                self.status_message = format!("Error: {}", e);
+                self.set_status_message(format!("Error: {}", e));
             } else {
-                self.status_message = "Written".to_string();
+                self.set_status_message(format!("Written {} bytes", self.document.size_bytes()));
             }
         } else if cmd == "wq" {
              let _ = self.document.save();
              self.should_quit = true;
         } else {
-            self.status_message = format!("Not an editor command: {}", cmd);
+            self.set_status_message(format!("Not an editor command: {}", cmd));
         }
+    }
+    
+    fn set_status_message(&mut self, msg: String) {
+        self.status_message = msg;
+        self.status_time = Instant::now();
     }
     
     fn move_cursor(&mut self, dx: i32, dy: i32) {

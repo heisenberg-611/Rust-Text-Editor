@@ -52,6 +52,14 @@ impl Document {
         self.rows.len()
     }
 
+    pub fn size_bytes(&self) -> usize {
+        let mut sum = 0;
+        for row in &self.rows {
+            sum += row.len() + 1; // +1 for newline
+        }
+        sum
+    }
+
     pub fn insert(&mut self, at: &crate::editor::Position, c: char) {
         if c == '\n' {
             self.insert_newline(at);
