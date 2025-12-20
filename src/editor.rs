@@ -36,6 +36,7 @@ pub struct Editor {
     status_time: Instant,
     mode: Mode,
     selection_start: Option<Position>,
+    mouse_drag_start: Option<Position>,
     clipboard: Option<arboard::Clipboard>,
     #[allow(dead_code)]
     config: Config,
@@ -69,6 +70,7 @@ impl Editor {
             status_time: Instant::now(),
             mode: Mode::Normal,
             selection_start: None,
+            mouse_drag_start: None,
             clipboard,
             config,
             command_buffer: String::new(),
@@ -131,12 +133,12 @@ impl Editor {
                              } else {
                                  // This row is part of the selection range
                                  let row_len = row.len();
-                                 let sel_start_x = if current_row_idx == start.y { start.x } else { 0 };
-                                 let sel_end_x = if current_row_idx == end.y { end.x.min(row_len) } else { row_len };
+                                 let _sel_start_x = if current_row_idx == start.y { start.x } else { 0 };
+                                 let _sel_end_x = if current_row_idx == end.y { end.x.min(row_len) } else { row_len };
                                  
                                  // Adjust for viewport offset
-                                 let render_start_x = sel_start_x.saturating_sub(offset_x);
-                                 let render_end_x = sel_end_x.saturating_sub(offset_x);
+                                 // let _render_start_x = sel_start_x.saturating_sub(offset_x);
+                                 // let _render_end_x = sel_end_x.saturating_sub(offset_x);
                                  
                                  // We need to split row_content string into chars to handle multibyte correctly and indices
                                  // Ideally we would work with byte indices or char indices from row.render
@@ -272,30 +274,35 @@ impl Editor {
     }
 
     fn process_mouse(&mut self, event: MouseEvent) {
-        if let MouseEventKind::Down(MouseButton::Left) = event.kind {
-             let x = event.column as usize;
-             let y = event.row as usize;
-             // We need to adjust for offsets and UI layout (e.g. status bar is at bottom)
-             // The text area is at chunks[0]
+        let x = event.column as usize;
+        let y = event.row as usize;
+        let terminal_height = self.terminal.backend.size().unwrap().height as usize;
+        
+        // Check if click is within text area (simplified)
+        if y < terminal_height.saturating_sub(2) {
+             let doc_x = self.offset.x + x;
+             let doc_y = self.offset.y + y;
              
-             // Simplification: We blindly assume text area starts at 0,0 and takes up most space.
-             // But we have chunks[0] height. We know status bar is last 2 lines.
-             // We should check if y is within the text area.
-             
-             let terminal_height = self.terminal.backend.size().unwrap().height as usize;
-             if y < terminal_height.saturating_sub(2) {
-                  let doc_x = self.offset.x + x;
-                  let doc_y = self.offset.y + y;
-                  self.move_cursor_absolute(doc_x, doc_y);
-                  
-                  if self.mode == Mode::Visual {
-                      // If clicking in visual mode, maybe update selection end?
-                      // For now let's just move cursor. Standard behavior: click resets selection unless Shift held.
-                      // Let's reset mode to Normal if mouse clicked? Or keep visual and update end?
-                      // Let's go to Normal mode on click for simplicity.
+             match event.kind {
+                 MouseEventKind::Down(MouseButton::Left) => {
+                      self.move_cursor_absolute(doc_x, doc_y);
                       self.mode = Mode::Normal;
                       self.selection_start = None;
-                  }
+                      self.mouse_drag_start = Some(self.cursor_position);
+                 }
+                 MouseEventKind::Drag(MouseButton::Left) => {
+                      self.move_cursor_absolute(doc_x, doc_y);
+                      if self.mouse_drag_start.is_some() {
+                          if self.mode == Mode::Normal {
+                              self.mode = Mode::Visual;
+                              self.selection_start = self.mouse_drag_start;
+                          }
+                      }
+                 }
+                 MouseEventKind::Up(MouseButton::Left) => {
+                      self.mouse_drag_start = None;
+                 }
+                 _ => {}
              }
         }
     }
