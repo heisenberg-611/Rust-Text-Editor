@@ -212,7 +212,7 @@ impl Document {
             
             let mut start_x = at.x;
             
-            for _ in 0..self.len() {
+            for _ in 0..=self.len() {
                 if let Some(row) = self.rows.get(y) {
                     // Find all occurrences in row
                     // We need char indices
@@ -248,7 +248,7 @@ impl Document {
             
             // Wait, we iterate rows backwards.
             
-            for _ in 0..self.len() {
+            for _ in 0..=self.len() {
                 if let Some(row) = self.rows.get(y) {
                      let mut matches = Vec::new();
                     for (byte_idx, _) in row.content.match_indices(query) {

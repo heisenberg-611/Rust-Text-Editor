@@ -16,9 +16,12 @@ impl From<&str> for Row {
 
 impl Row {
     pub fn render(&self, start: usize, end: usize) -> String {
-        let end = std::cmp::min(end, self.content.len());
-        let start = std::cmp::min(start, end);
-        self.content.get(start..end).unwrap_or("").to_string()
+        let len = self.len();
+        if start >= len {
+            return String::new();
+        }
+        let end = std::cmp::min(end, len);
+        self.content.chars().skip(start).take(end - start).collect()
     }
 
     pub fn len(&self) -> usize {
