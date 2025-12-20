@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct Config {
     #[serde(default)]
     pub editor: EditorConfig,
@@ -11,6 +12,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct EditorConfig {
     #[serde(default = "default_line_numbers")]
     pub line_numbers: bool,
@@ -19,6 +21,7 @@ pub struct EditorConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct ThemeConfig {
     #[serde(default = "default_background")]
     pub background: String,

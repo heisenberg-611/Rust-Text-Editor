@@ -1,9 +1,9 @@
-use unicode_width::UnicodeWidthStr;
+
 
 #[derive(Default)]
 pub struct Row {
     pub content: String,
-    len: usize,
+    pub len: usize,
 }
 
 impl From<&str> for Row {
@@ -25,6 +25,7 @@ impl Row {
         self.len
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }

@@ -3,6 +3,10 @@ name = "text-editor"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "meow"
+path = "src/main.rs"
+
 [dependencies]
 ratatui = "0.29.0"
 crossterm = "0.28.1"
@@ -10,3 +14,4 @@ serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 anyhow = "1.0"
 unicode-width = "0.1"
+arboard = "3.4"

@@ -3,7 +3,7 @@ line_numbers = true
 mouse_support = true
 
 [theme]
-background = "#1e1e1e"
+background = "#3e3d3dff"
 foreground = "#ffffff"
 cursor = "#cccccc"
 selection_bg = "#3e4451"

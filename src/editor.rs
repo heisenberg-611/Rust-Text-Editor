@@ -1,18 +1,17 @@
 use crate::config::Config;
 use crate::document::Document;
 use crate::terminal::Terminal;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind, MouseButton};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
-    Frame,
+    widgets::Paragraph,
 };
 use std::io;
 use std::time::{Duration, Instant};
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -23,6 +22,7 @@ pub enum Mode {
     Normal,
     Insert,
     Command,
+    Visual,
 }
 
 pub struct Editor {
@@ -32,8 +32,12 @@ pub struct Editor {
     offset: Position,
     document: Document,
     status_message: String,
+    #[allow(dead_code)]
     status_time: Instant,
     mode: Mode,
+    selection_start: Option<Position>,
+    clipboard: Option<arboard::Clipboard>,
+    #[allow(dead_code)]
     config: Config,
     command_buffer: String,
 }
@@ -50,7 +54,10 @@ impl Editor {
                 document.file_name = Some(filename.clone());
             }
         }
+
+
         let config = Config::load();
+        let clipboard = arboard::Clipboard::new().ok();
 
         Self {
             should_quit: false,
@@ -61,6 +68,8 @@ impl Editor {
             status_message: String::new(),
             status_time: Instant::now(),
             mode: Mode::Normal,
+            selection_start: None,
+            clipboard,
             config,
             command_buffer: String::new(),
         }
@@ -105,7 +114,86 @@ impl Editor {
              let file_row = y + offset_y;
              if file_row < doc_len {
                  if let Some(row) = self.document.row(file_row) {
-                     lines.push(Line::from(row.render(offset_x, offset_x + width)));
+                     let mut spans = Vec::new();
+                     let row_content = row.render(offset_x, offset_x + width);
+                     
+                     if self.mode == Mode::Visual {
+                         if let Some(start_pos) = self.selection_start {
+                             let (start, end) = if start_pos.y < self.cursor_position.y || (start_pos.y == self.cursor_position.y && start_pos.x <= self.cursor_position.x) {
+                                 (start_pos, self.cursor_position)
+                             } else {
+                                 (self.cursor_position, start_pos)
+                             };
+
+                             let current_row_idx = file_row;
+                             if current_row_idx < start.y || current_row_idx > end.y {
+                                 spans.push(Span::raw(row_content));
+                             } else {
+                                 // This row is part of the selection range
+                                 let row_len = row.len();
+                                 let sel_start_x = if current_row_idx == start.y { start.x } else { 0 };
+                                 let sel_end_x = if current_row_idx == end.y { end.x.min(row_len) } else { row_len };
+                                 
+                                 // Adjust for viewport offset
+                                 let render_start_x = sel_start_x.saturating_sub(offset_x);
+                                 let render_end_x = sel_end_x.saturating_sub(offset_x);
+                                 
+                                 // We need to split row_content string into chars to handle multibyte correctly and indices
+                                 // Ideally we would work with byte indices or char indices from row.render
+                                 // For simplicity, let's just highlight the whole line if fully selected, 
+                                 // or try to substring. Note: row.render returns a substring of the content.
+                                 
+                                 // Let's iterate chars of render result
+                                 let mut current_x = offset_x;
+                                 let mut normal_before = String::new();
+                                 let mut selected = String::new();
+                                 let mut normal_after = String::new();
+                                 
+                                 for c in row.content.chars() {
+                                     if current_x >= offset_x + width { break; }
+                                     if current_x >= offset_x {
+                                         // Visible char
+                                         let is_selected = if current_row_idx > start.y && current_row_idx < end.y {
+                                             true
+                                         } else if current_row_idx == start.y && current_row_idx == end.y {
+                                             current_x >= start.x && current_x <= end.x // Inclusive end for cursor feel? Standard VIM is usually exclusive on end or inclusive depending on settings. Let's do inclusive of cursor.
+                                         } else if current_row_idx == start.y {
+                                             current_x >= start.x
+                                         } else if current_row_idx == end.y {
+                                             current_x <= end.x
+                                         } else {
+                                             false
+                                         };
+
+                                         if is_selected {
+                                             selected.push(c);
+                                         } else if !selected.is_empty() && normal_after.is_empty(){
+                                              normal_after.push(c);
+                                         } else if selected.is_empty() {
+                                              normal_before.push(c);
+                                         } else {
+                                              normal_after.push(c);
+                                         }
+                                     }
+                                     current_x += 1;
+                                 }
+                                 
+                                 if !normal_before.is_empty() { spans.push(Span::raw(normal_before)); }
+                                 if !selected.is_empty() { spans.push(Span::styled(selected, Style::default().bg(Color::Blue))); }
+                                 if !normal_after.is_empty() { spans.push(Span::raw(normal_after)); }
+                                 
+                                 // Fallback if logic failed (e.g empty selection that implies cursor pos)
+                                 if spans.is_empty() {
+                                     spans.push(Span::raw(row_content));
+                                 }
+                             }
+                         } else {
+                              spans.push(Span::raw(row_content));
+                         }
+                     } else {
+                         spans.push(Span::raw(row_content));
+                     }
+                     lines.push(Line::from(spans));
                  }
              } else if file_row == doc_len && doc_len == 0 {
                   lines.push(Line::from("~ empty buffer ~"));
@@ -122,7 +210,7 @@ impl Editor {
                     Constraint::Length(1),
                     Constraint::Length(1),
                 ].as_ref())
-                .split(f.size());
+                .split(f.area());
 
             let text_area = Paragraph::new(lines);
             f.render_widget(text_area, chunks[0]);
@@ -132,6 +220,7 @@ impl Editor {
                 Mode::Normal => "NORMAL",
                 Mode::Insert => "INSERT",
                 Mode::Command => "COMMAND",
+                Mode::Visual => "VISUAL",
             };
             let status_text = format!(" {} | {} | Lines: {}", mode_str, filename, doc_len);
             let status_bar = Paragraph::new(status_text)
@@ -146,16 +235,15 @@ impl Editor {
             };
             f.render_widget(Paragraph::new(cmd_text), chunks[2]);
             
-            // Cursor
             if mode != Mode::Command {
-                f.set_cursor(
-                    (chunks[0].x + cursor_x as u16),
-                    (chunks[0].y + cursor_y as u16),
+                f.set_cursor_position(
+                    (chunks[0].x + cursor_x as u16,
+                    chunks[0].y + cursor_y as u16),
                 );
             } else {
-                 f.set_cursor(
-                    (chunks[2].x + 1 + command_buf.len() as u16),
-                     chunks[2].y
+                 f.set_cursor_position(
+                    (chunks[2].x + 1 + command_buf.len() as u16,
+                     chunks[2].y)
                 );
             }
         })?;
@@ -164,15 +252,96 @@ impl Editor {
 
     fn process_keypress(&mut self) -> Result<(), io::Error> {
         if crossterm::event::poll(Duration::from_millis(100))? {
-            if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
-                match self.mode {
-                    Mode::Normal => self.process_normal_mode(key),
-                    Mode::Insert => self.process_insert_mode(key),
-                    Mode::Command => self.process_command_mode(key),
+            let event = crossterm::event::read()?;
+            match event {
+                crossterm::event::Event::Key(key) => {
+                    match self.mode {
+                        Mode::Normal => self.process_normal_mode(key),
+                        Mode::Insert => self.process_insert_mode(key),
+                        Mode::Command => self.process_command_mode(key),
+                        Mode::Visual => self.process_visual_mode(key),
+                    }
                 }
+                crossterm::event::Event::Mouse(mouse_event) => {
+                     self.process_mouse(mouse_event);
+                }
+                _ => {}
             }
         }
         Ok(())
+    }
+
+    fn process_mouse(&mut self, event: MouseEvent) {
+        if let MouseEventKind::Down(MouseButton::Left) = event.kind {
+             let x = event.column as usize;
+             let y = event.row as usize;
+             // We need to adjust for offsets and UI layout (e.g. status bar is at bottom)
+             // The text area is at chunks[0]
+             
+             // Simplification: We blindly assume text area starts at 0,0 and takes up most space.
+             // But we have chunks[0] height. We know status bar is last 2 lines.
+             // We should check if y is within the text area.
+             
+             let terminal_height = self.terminal.backend.size().unwrap().height as usize;
+             if y < terminal_height.saturating_sub(2) {
+                  let doc_x = self.offset.x + x;
+                  let doc_y = self.offset.y + y;
+                  self.move_cursor_absolute(doc_x, doc_y);
+                  
+                  if self.mode == Mode::Visual {
+                      // If clicking in visual mode, maybe update selection end?
+                      // For now let's just move cursor. Standard behavior: click resets selection unless Shift held.
+                      // Let's reset mode to Normal if mouse clicked? Or keep visual and update end?
+                      // Let's go to Normal mode on click for simplicity.
+                      self.mode = Mode::Normal;
+                      self.selection_start = None;
+                  }
+             }
+        }
+    }
+
+    fn process_visual_mode(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Normal;
+                self.selection_start = None;
+            }
+            KeyCode::Char('h') => self.move_cursor(-1, 0),
+            KeyCode::Char('j') => self.move_cursor(0, 1),
+            KeyCode::Char('k') => self.move_cursor(0, -1),
+            KeyCode::Char('l') => self.move_cursor(1, 0),
+            KeyCode::Char('y') => {
+                if let Some(start) = self.selection_start {
+                    let content = self.document.get_substring(&start, &self.cursor_position);
+                    if let Some(cb) = &mut self.clipboard {
+                        let _ = cb.set_text(content);
+                    }
+                }
+                self.mode = Mode::Normal;
+                self.selection_start = None;
+                self.status_message = "Yanked!".to_string();
+            }
+            KeyCode::Char('d') | KeyCode::Char('x') => {
+                 if let Some(start) = self.selection_start {
+                    let content = self.document.get_substring(&start, &self.cursor_position);
+                    if let Some(cb) = &mut self.clipboard {
+                        let _ = cb.set_text(content);
+                    }
+                    self.document.delete_range(&start, &self.cursor_position);
+                    // Move cursor to start of deletion
+                    let (new_pos, _) = if start.y < self.cursor_position.y || (start.y == self.cursor_position.y && start.x <= self.cursor_position.x) {
+                        (start, self.cursor_position)
+                    } else {
+                        (self.cursor_position, start)
+                    };
+                    self.move_cursor_absolute(new_pos.x, new_pos.y);
+                }
+                self.mode = Mode::Normal;
+                self.selection_start = None;
+                self.status_message = "Cut!".to_string();
+            }
+            _ => {}
+        }
     }
 
     fn process_normal_mode(&mut self, key: KeyEvent) {
@@ -188,6 +357,25 @@ impl Editor {
             KeyCode::Char('k') => self.move_cursor(0, -1),
             KeyCode::Char('l') => self.move_cursor(1, 0),
             KeyCode::Char('x') => self.document.delete(&self.cursor_position),
+            KeyCode::Char('v') => {
+                self.mode = Mode::Visual;
+                self.selection_start = Some(self.cursor_position);
+            }
+            KeyCode::Char('p') => {
+                if let Some(cb) = &mut self.clipboard {
+                    if let Ok(content) = cb.get_text() {
+                         for c in content.chars() {
+                             self.document.insert(&self.cursor_position, c);
+                             if c == '\n' {
+                                 let pos = Position { x: 0, y: self.cursor_position.y + 1 };
+                                 self.move_cursor_absolute(pos.x, pos.y);
+                             } else {
+                                 self.move_cursor(1, 0);
+                             }
+                         }
+                    }
+                }
+            }
             _ => {}
         }
     }
