@@ -5,15 +5,15 @@ use std::path::Path;
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Config {
-    #[serde(default)]
     pub editor: EditorConfig,
-    #[serde(default)]
     pub theme: ThemeConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct EditorConfig {
+    #[serde(default = "default_tab_size")]
+    pub tab_size: usize,
     #[serde(default = "default_line_numbers")]
     pub line_numbers: bool,
     #[serde(default = "default_mouse_support")]
@@ -37,15 +37,11 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             editor: EditorConfig {
-                line_numbers: true,
-                mouse_support: true,
+                 tab_size: 4,
+                 line_numbers: true,
+                 mouse_support: true,
             },
-            theme: ThemeConfig {
-                background: "#1e1e1e".into(),
-                foreground: "#ffffff".into(),
-                cursor: "#cccccc".into(),
-                selection_bg: "#3e4451".into(),
-            },
+            theme: ThemeConfig::default(),
         }
     }
 }
@@ -53,6 +49,7 @@ impl Default for Config {
 impl Default for EditorConfig {
     fn default() -> Self {
         Self {
+            tab_size: 4,
             line_numbers: true,
             mouse_support: true,
         }
@@ -70,6 +67,7 @@ impl Default for ThemeConfig {
     }
 }
 
+fn default_tab_size() -> usize { 4 }
 fn default_line_numbers() -> bool { true }
 fn default_mouse_support() -> bool { true }
 fn default_background() -> String { "#1e1e1e".to_string() }

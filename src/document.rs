@@ -3,6 +3,12 @@ use crate::row::Row;
 use std::fs;
 use std::io::{Error, Write};
 
+#[derive(PartialEq, Copy, Clone)]
+pub enum SearchDirection {
+    Forward,
+    Backward,
+}
+
 #[derive(Default)]
 pub struct Document {
     pub rows: Vec<Row>,
@@ -183,5 +189,100 @@ impl Document {
                  row.len += remainder_len;
              }
         }
+    }
+
+    pub fn find(&self, query: &str, at: &Position, direction: SearchDirection) -> Option<Position> {
+        if query.is_empty() {
+            return None;
+        }
+
+        let mut y = at.y;
+        
+        // Forward Search
+        if direction == SearchDirection::Forward {
+            // 1. Search current line starting from at.x (+1 to avoid finding current char if it matches? usually find next means AFTER cursor)
+            // But if cursor is ON the match, 'n' should go to next.
+            // So we start searching from at.x + 1 usually?
+            // If I type /foo, and I am at start of file, I want to find foo at line 1.
+            // If I am ON foo, 'n' should find next foo.
+            // Let's assume 'at' is current cursor.
+            // We search from x. If match starts exactly at x, it counts as "found" (e.g. initial search).
+            // But for 'n' (Next), the editor logic usually advances x before calling find, OR find takes an arg "skip_current".
+            // Let's make find inclusive of 'at', and let Editor handle 'n' by passing at.x + 1.
+            
+            let mut start_x = at.x;
+            
+            for _ in 0..self.len() {
+                if let Some(row) = self.rows.get(y) {
+                    // Find all occurrences in row
+                    // We need char indices
+                    let mut matches = Vec::new();
+                    for (byte_idx, _) in row.content.match_indices(query) {
+                        matches.push(row.content[..byte_idx].chars().count());
+                    }
+                    
+                    // Find first match >= start_x
+                    if let Some(&match_x) = matches.iter().find(|&&x| x >= start_x) {
+                        return Some(Position { x: match_x, y });
+                    }
+                }
+                
+                y = (y + 1) % self.len();
+                start_x = 0; // For next lines, start from 0
+            }
+        } else {
+            // Backward Search
+            // 1. Search current line up to at.x
+            // logic: find max match_x such that match_x < at.x (strictly? usually yes for 'N' if we are on match)
+            // Or inclusive?
+            // For 'N', if we are on a match start, we want previous one.
+            // Let's assume exclusive upper bound? 
+            // Let's verify: Editor will pass 'at'.
+            // If I am on match, 'N' should go back.
+            // So we look for matches < at.x
+            
+            let mut limit_x = at.x; // We look for match_x < limit_x ?? 
+            // Actually, simply: If I am at 10, and match is at 10.
+            // N should go to occurrence before 10.
+            // So we strictly filter < at.x check?
+            
+            // Wait, we iterate rows backwards.
+            
+            for _ in 0..self.len() {
+                if let Some(row) = self.rows.get(y) {
+                     let mut matches = Vec::new();
+                    for (byte_idx, _) in row.content.match_indices(query) {
+                        matches.push(row.content[..byte_idx].chars().count());
+                    }
+                    
+                    // Find last match < limit_x
+                    // Use simple filter
+                    // Note: if limit_x is None (conceptually infinity for other lines), we take max.
+                    
+                    // Logic:
+                    // If this is the START line (first iteration): find match < at.x
+                    // If this is NOT start line: find any match (max one)
+                    
+                    let candidate = if y == at.y && limit_x != usize::MAX {
+                        matches.iter().filter(|&&x| x < at.x).last()
+                    } else {
+                        matches.last()
+                    };
+                    
+                    if let Some(&match_x) = candidate {
+                        return Some(Position { x: match_x, y });
+                    }
+                }
+                
+                if y == 0 {
+                    y = self.len().saturating_sub(1);
+                } else {
+                    y -= 1;
+                }
+                limit_x = usize::MAX; // Reset limit for next lines
+            }
+        }
+
+        None
     }
 }

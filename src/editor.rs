@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::document::Document;
+use crate::document::{Document, SearchDirection};
 use crate::terminal::Terminal;
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind, MouseButton};
 use ratatui::{
@@ -10,6 +10,18 @@ use ratatui::{
 };
 use std::io;
 use std::time::{Duration, Instant};
+
+fn parse_hex_color(hex: &str) -> Color {
+    if hex.len() != 7 || !hex.starts_with('#') {
+        return Color::Reset;
+    }
+    
+    let r = u8::from_str_radix(&hex[1..3], 16).unwrap_or(0);
+    let g = u8::from_str_radix(&hex[3..5], 16).unwrap_or(0);
+    let b = u8::from_str_radix(&hex[5..7], 16).unwrap_or(0);
+    
+    Color::Rgb(r, g, b)
+}
 
 #[derive(Default, Clone, Copy, PartialEq)]
 pub struct Position {
@@ -23,6 +35,7 @@ pub enum Mode {
     Insert,
     Command,
     Visual,
+    Search,
 }
 
 pub struct Editor {
@@ -37,6 +50,7 @@ pub struct Editor {
     mode: Mode,
     selection_start: Option<Position>,
     mouse_drag_start: Option<Position>,
+    last_search_query: Option<String>,
     clipboard: Option<arboard::Clipboard>,
     #[allow(dead_code)]
     config: Config,
@@ -71,6 +85,7 @@ impl Editor {
             mode: Mode::Normal,
             selection_start: None,
             mouse_drag_start: None,
+            last_search_query: None,
             clipboard,
             config,
             command_buffer: String::new(),
@@ -180,27 +195,33 @@ impl Editor {
                                      current_x += 1;
                                  }
                                  
-                                 if !normal_before.is_empty() { spans.push(Span::raw(normal_before)); }
-                                 if !selected.is_empty() { spans.push(Span::styled(selected, Style::default().bg(Color::Blue))); }
-                                 if !normal_after.is_empty() { spans.push(Span::raw(normal_after)); }
+                                 if !normal_before.is_empty() { 
+                                     spans.push(Span::styled(normal_before, Style::default().fg(parse_hex_color(&self.config.theme.foreground)))); 
+                                 }
+                                 if !selected.is_empty() { 
+                                     spans.push(Span::styled(selected, Style::default().bg(parse_hex_color(&self.config.theme.selection_bg)).fg(parse_hex_color(&self.config.theme.foreground)))); 
+                                 }
+                                 if !normal_after.is_empty() { 
+                                     spans.push(Span::styled(normal_after, Style::default().fg(parse_hex_color(&self.config.theme.foreground)))); 
+                                 }
                                  
                                  // Fallback if logic failed (e.g empty selection that implies cursor pos)
                                  if spans.is_empty() {
-                                     spans.push(Span::raw(row_content));
+                                     spans.push(Span::styled(row_content, Style::default().fg(parse_hex_color(&self.config.theme.foreground))));
                                  }
                              }
                          } else {
-                              spans.push(Span::raw(row_content));
+                              spans.push(Span::styled(row_content, Style::default().fg(parse_hex_color(&self.config.theme.foreground))));
                          }
                      } else {
-                         spans.push(Span::raw(row_content));
+                         spans.push(Span::styled(row_content, Style::default().fg(parse_hex_color(&self.config.theme.foreground))));
                      }
                      lines.push(Line::from(spans));
                  }
              } else if file_row == doc_len && doc_len == 0 {
-                  lines.push(Line::from("~ empty buffer ~"));
+                  lines.push(Line::styled("~ empty buffer ~", Style::default().fg(Color::DarkGray)));
              } else {
-                 lines.push(Line::from("~"));
+                 lines.push(Line::styled("~", Style::default().fg(Color::DarkGray)));
              }
         }
 
@@ -214,7 +235,8 @@ impl Editor {
                 ].as_ref())
                 .split(f.area());
 
-            let text_area = Paragraph::new(lines);
+            let text_area = Paragraph::new(lines)
+                .style(Style::default().bg(parse_hex_color(&self.config.theme.background)));
             f.render_widget(text_area, chunks[0]);
 
             // Status Bar
@@ -223,21 +245,23 @@ impl Editor {
                 Mode::Insert => "INSERT",
                 Mode::Command => "COMMAND",
                 Mode::Visual => "VISUAL",
+                Mode::Search => "SEARCH",
             };
             let status_text = format!(" {} | {} | Lines: {}", mode_str, filename, doc_len);
             let status_bar = Paragraph::new(status_text)
-                .style(Style::default().bg(Color::Blue).fg(Color::White));
+                .style(Style::default().bg(parse_hex_color(&self.config.theme.selection_bg)).fg(parse_hex_color(&self.config.theme.foreground)));
             f.render_widget(status_bar, chunks[1]);
             
             // Command/Message Line
-            let cmd_text = if mode == Mode::Command {
-                format!(":{}", command_buf)
-            } else {
-                status_msg
+            let cmd_text = match mode {
+                Mode::Command => format!(":{}", command_buf),
+                Mode::Search => format!("/{}", command_buf),
+                _ => status_msg,
             };
+            
             f.render_widget(Paragraph::new(cmd_text), chunks[2]);
             
-            if mode != Mode::Command {
+            if mode != Mode::Command && mode != Mode::Search {
                 f.set_cursor_position(
                     (chunks[0].x + cursor_x as u16,
                     chunks[0].y + cursor_y as u16),
@@ -262,6 +286,7 @@ impl Editor {
                         Mode::Insert => self.process_insert_mode(key),
                         Mode::Command => self.process_command_mode(key),
                         Mode::Visual => self.process_visual_mode(key),
+                        Mode::Search => self.process_search_mode(key),
                     }
                 }
                 crossterm::event::Event::Mouse(mouse_event) => {
@@ -383,6 +408,20 @@ impl Editor {
                     }
                 }
             }
+            KeyCode::Char('/') => {
+                self.mode = Mode::Search;
+                self.command_buffer.clear();
+            }
+            KeyCode::Char('n') => {
+                 if let Some(query) = self.last_search_query.clone() {
+                     self.run_search(&query, SearchDirection::Forward);
+                 }
+            }
+            KeyCode::Char('N') => {
+                 if let Some(query) = self.last_search_query.clone() {
+                     self.run_search(&query, SearchDirection::Backward);
+                 }
+            }
             _ => {}
         }
     }
@@ -425,6 +464,63 @@ impl Editor {
                 self.mode = Mode::Normal;
             }
             _ => {}
+        }
+    }
+    
+    fn process_search_mode(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.mode = Mode::Normal;
+                self.command_buffer.clear();
+            }
+            KeyCode::Char(c) => {
+                self.command_buffer.push(c);
+            }
+            KeyCode::Backspace => {
+                self.command_buffer.pop();
+            }
+            KeyCode::Enter => {
+                let query = self.command_buffer.clone();
+                self.last_search_query = Some(query.clone());
+                self.mode = Mode::Normal;
+                self.run_search(&query, SearchDirection::Forward);
+                self.command_buffer.clear();
+            }
+            _ => {}
+        }
+    }
+
+    fn run_search(&mut self, query: &str, direction: SearchDirection) {
+        let start_pos = match direction {
+             SearchDirection::Forward => {
+                 // Forward search should start AFTER current char to find next match
+                 // But wait, our find logic scans matches >= start_x.
+                 // So if we are on match, we find it again.
+                 // So for 'n', we should advance by 1?
+                 // Or we pass cursor pos, and `find` is inclusive.
+                 // We want strictly next.
+                 
+                 // Let's modify start pos.
+                 if self.cursor_position.x < usize::MAX { // Safety match
+                     Position { x: self.cursor_position.x + 1, y: self.cursor_position.y }
+                 } else {
+                     self.cursor_position
+                 }
+             },
+             SearchDirection::Backward => {
+                 // For backward, we want match < current_x.
+                 // Our find logic looks for matches < limit_x
+                 // So passing cursor_position is correct (exclusive logic there)
+                 self.cursor_position
+             }
+        };
+
+        if let Some(pos) = self.document.find(query, &start_pos, direction) {
+            self.move_cursor_absolute(pos.x, pos.y);
+            self.selection_start = None; // clear selection if any
+            self.status_message = String::new();
+        } else {
+            self.status_message = format!("Pattern not found: {}", query);
         }
     }
 
