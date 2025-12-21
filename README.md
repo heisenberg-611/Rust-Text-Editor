@@ -1,6 +1,19 @@
 # Text Editor in Rust
 
+<div align="center">
+
+[![MIT License](https://img.shields.io/github/license/heisenberg-611/Rust-Text-Editor?style=for-the-badge&color=blue)](https://github.com/heisenberg-611/Rust-Text-Editor/blob/master/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/heisenberg-611/Rust-Text-Editor?style=for-the-badge&color=gold)](https://github.com/heisenberg-611/Rust-Text-Editor/stargazers)
+[![Rust](https://img.shields.io/badge/language-Rust-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
+[![Repo Size](https://img.shields.io/github/repo-size/heisenberg-611/Rust-Text-Editor?style=for-the-badge&color=brightgreen)](https://github.com/heisenberg-611/Rust-Text-Editor)
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-blue?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/dhrubojyoti-saha-b75639349/)
+[![Twitter/X](https://img.shields.io/badge/Twitter-X-black?style=for-the-badge&logo=x)](https://twitter.com/Dhrubojyoti279)
+
+</div>
+
 A modal text editor inspired by Neovim, built with Rust.
+
 ![Screenshot of editor](https://i.imgur.com/WVURAPQ.jpeg)
 ## Features
 
