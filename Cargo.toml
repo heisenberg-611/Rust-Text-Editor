@@ -1,7 +1,7 @@
 [package]
 name = "Rust-text-editor_meow_"
-version = "3.1416"
-edition = "2025"
+version = "3.1416.0"
+edition = "2024"
 
 [[bin]]
 name = "meow"
