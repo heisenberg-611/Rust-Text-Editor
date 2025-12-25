@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![MIT License](https://img.shields.io/github/license/heisenberg-611/Rust-Text-Editor?style=for-the-badge&color=blue)](https://github.com/heisenberg-611/Rust-Text-Editor/blob/master/LICENSE.txt)
+[![Apache 2.0 License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](https://github.com/heisenberg-611/Rust-Text-Editor/blob/master/LICENSE.txt)
 [![GitHub stars](https://img.shields.io/github/stars/heisenberg-611/Rust-Text-Editor?style=for-the-badge&color=gold)](https://github.com/heisenberg-611/Rust-Text-Editor/stargazers)
 [![Rust](https://img.shields.io/badge/language-Rust-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 [![Repo Size](https://img.shields.io/github/repo-size/heisenberg-611/Rust-Text-Editor?style=for-the-badge&color=brightgreen)](https://github.com/heisenberg-611/Rust-Text-Editor)
