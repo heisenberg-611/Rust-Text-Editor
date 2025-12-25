@@ -3,6 +3,19 @@
 version = 4
 
 [[package]]
+name = "Rust-text-editor_meow_"
+version = "3.1416.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "crossterm",
+ "ratatui",
+ "serde",
+ "toml",
+ "unicode-width 0.1.14",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -824,19 +837,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "text-editor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arboard",
- "crossterm",
- "ratatui",
- "serde",
- "toml",
- "unicode-width 0.1.14",
 ]
 
 [[package]]

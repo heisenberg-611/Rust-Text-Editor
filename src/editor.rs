@@ -439,6 +439,12 @@ impl Editor {
                 MouseEventKind::Up(MouseButton::Left) => {
                     self.mouse_drag_start = None;
                 }
+                MouseEventKind::ScrollUp => {
+                    self.move_cursor(0, -3);
+                }
+                MouseEventKind::ScrollDown => {
+                    self.move_cursor(0, 3);
+                }
                 _ => {}
             }
         }
