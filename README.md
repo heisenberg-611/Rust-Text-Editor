@@ -81,6 +81,7 @@ selection_bg = "#3e4451"
 - `/`: Enter Search Mode.
 - `n` / `N`: Next / Previous search match.
 - `:`; Enter Command Mode.
+- Scrolling function
 
 ### Insert Mode
 - `Esc`: Return to Normal Mode.
