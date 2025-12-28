@@ -2,7 +2,7 @@
 tab_size = 4
 line_numbers = true
 mouse_support = true
-theme = "tokyonight" # See available themes below
+theme = "nord" # See available themes below
 
 [theme]
 # (Optional) Overrides for specific colors if "theme" is set to "default" or left empty.
