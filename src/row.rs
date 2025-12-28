@@ -39,57 +39,6 @@ impl Row {
         self.len == 0
     }
 
-    pub fn insert(&mut self, at: usize, c: char) {
-        if at >= self.len {
-            self.content.push(c);
-            self.highlighting.push(HighlightType::None);
-        } else {
-            let mut result: String = self.content.chars().take(at).collect();
-            result.push(c);
-            let rest: String = self.content.chars().skip(at).collect();
-            result.push_str(&rest);
-            self.content = result;
-
-            self.highlighting.insert(at, HighlightType::None);
-        }
-        self.len += 1;
-    }
-
-    pub fn delete(&mut self, at: usize) {
-        if at >= self.len {
-            return;
-        }
-        let mut result: String = self.content.chars().take(at).collect();
-        let rest: String = self.content.chars().skip(at + 1).collect();
-        result.push_str(&rest);
-        self.content = result;
-
-        self.highlighting.remove(at);
-        self.len -= 1;
-    }
-
-    pub fn append(&mut self, new: &Row) {
-        self.content = format!("{}{}", self.content, new.content);
-        self.highlighting.extend(&new.highlighting);
-        self.len += new.len;
-    }
-
-    pub fn split(&mut self, at: usize) -> Row {
-        let beginning: String = self.content.chars().take(at).collect();
-        let remainder: String = self.content.chars().skip(at).collect();
-
-        let highlighting_remainder = self.highlighting.split_off(at);
-
-        self.content = beginning;
-        self.len = at;
-
-        Row {
-            content: remainder,
-            len: highlighting_remainder.len(),
-            highlighting: highlighting_remainder,
-        }
-    }
-
     pub fn update_highlighting(&mut self, syntax: &crate::syntax::Syntax) {
         self.highlighting = vec![HighlightType::None; self.len];
         let chars: Vec<char> = self.content.chars().collect();

@@ -1,7 +1,8 @@
 use crate::editor::Position;
 use crate::row::Row;
+use ropey::Rope;
 use std::fs;
-use std::io::{Error, Write};
+use std::io::{BufWriter, Error};
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum SearchDirection {
@@ -10,7 +11,7 @@ pub enum SearchDirection {
 }
 
 pub struct Document {
-    pub rows: Vec<Row>,
+    pub content: Rope,
     pub file_name: Option<String>,
     pub dirty: bool,
     pub syntax: &'static crate::syntax::Syntax,
@@ -19,7 +20,7 @@ pub struct Document {
 impl Default for Document {
     fn default() -> Self {
         Self {
-            rows: Vec::new(),
+            content: Rope::new(),
             file_name: None,
             dirty: false,
             syntax: crate::syntax::Syntax::default_ref(),
@@ -30,15 +31,11 @@ impl Default for Document {
 impl Document {
     pub fn open(filename: &str) -> Result<Self, std::io::Error> {
         let contents = fs::read_to_string(filename)?;
+        let content = Rope::from_str(&contents);
         let syntax = crate::syntax::Syntax::select(filename);
-        let mut rows = Vec::new();
-        for value in contents.lines() {
-            let mut row = Row::from(value);
-            row.update_highlighting(syntax);
-            rows.push(row);
-        }
+
         Ok(Self {
-            rows,
+            content,
             file_name: Some(filename.to_string()),
             dirty: false,
             syntax,
@@ -47,198 +44,146 @@ impl Document {
 
     pub fn save(&self) -> Result<(), Error> {
         if let Some(file_name) = &self.file_name {
-            let mut file = fs::File::create(file_name)?;
-            for row in &self.rows {
-                file.write_all(row.content.as_bytes())?;
-                file.write_all(b"\n")?;
-            }
+            let file = fs::File::create(file_name)?;
+            let mut writer = BufWriter::new(file);
+            self.content.write_to(&mut writer)?;
         }
         Ok(())
     }
 
-    pub fn row(&self, index: usize) -> Option<&Row> {
-        self.rows.get(index)
+    pub fn row(&self, index: usize) -> Option<Row> {
+        if index >= self.len() {
+            return None;
+        }
+
+        let line = self.content.line(index);
+        // Ropey lines include the newline character, but Row expects without.
+        // We need to strip it.
+        let line_cow = line.to_string(); // Convert to String (owned)
+        // Check if ends with newline and remove it
+        let content = if line_cow.ends_with('\n') {
+            let mut s = line_cow;
+            s.pop();
+            if s.ends_with('\r') {
+                s.pop();
+            }
+            s
+        } else {
+            line_cow
+        };
+
+        let mut row = Row::from(content.as_str());
+        row.update_highlighting(self.syntax);
+        Some(row)
     }
 
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
-        self.rows.is_empty()
+        self.content.len_chars() == 0
     }
 
     pub fn len(&self) -> usize {
-        self.rows.len()
+        self.content.len_lines()
     }
 
     pub fn size_bytes(&self) -> usize {
-        let mut sum = 0;
-        for row in &self.rows {
-            sum += row.len() + 1; // +1 for newline
-        }
-        sum
+        self.content.len_bytes()
     }
 
     pub fn insert(&mut self, at: &crate::editor::Position, c: char) {
-        if c == '\n' {
-            self.insert_newline(at);
-            return;
+        let char_idx = self.position_to_char_idx(at);
+        if char_idx <= self.content.len_chars() {
+            self.content.insert_char(char_idx, c);
+            self.dirty = true;
         }
-        if at.y == self.len() {
-            let mut row = Row::default();
-            row.insert(0, c);
-            self.rows.push(row);
-        } else if at.y < self.len() {
-            let row = self.rows.get_mut(at.y).unwrap();
-            row.insert(at.x, c);
-            row.update_highlighting(self.syntax);
-        }
-        self.dirty = true;
     }
 
     pub fn insert_newline(&mut self, at: &crate::editor::Position) {
-        if at.y > self.len() {
-            return;
-        }
-        if at.y == self.len() {
-            self.rows.push(Row::default());
-            self.rows
-                .last_mut()
-                .unwrap()
-                .update_highlighting(self.syntax);
-            self.dirty = true;
-            return;
-        }
-        let new_row = self.rows.get_mut(at.y).unwrap().split(at.x);
-        self.rows
-            .get_mut(at.y)
-            .unwrap()
-            .update_highlighting(self.syntax);
-        let mut new_row = new_row;
-        new_row.update_highlighting(self.syntax);
-        self.rows.insert(at.y + 1, new_row);
-        self.dirty = true;
+        self.insert(at, '\n');
     }
 
     pub fn delete(&mut self, at: &crate::editor::Position) {
-        let len = self.len();
-        if at.y >= len {
-            return;
+        let char_idx = self.position_to_char_idx(at);
+        if char_idx < self.content.len_chars() {
+            self.content.remove(char_idx..char_idx + 1);
+            self.dirty = true;
         }
-        if at.x == self.rows.get_mut(at.y).unwrap().len() && at.y < len - 1 {
-            let next_row = self.rows.remove(at.y + 1);
-            let row = self.rows.get_mut(at.y).unwrap();
-            row.append(&next_row);
-            row.update_highlighting(self.syntax);
-        } else {
-            let row = self.rows.get_mut(at.y).unwrap();
-            row.delete(at.x);
-            row.update_highlighting(self.syntax);
+    }
+
+    // Helper to convert Position (x, y) to absolute char index for Rope
+    fn position_to_char_idx(&self, pos: &Position) -> usize {
+        if pos.y >= self.len() {
+            return self.content.len_chars();
         }
-        self.dirty = true;
+        let line_char_idx = self.content.line_to_char(pos.y);
+
+        // Ensure we don't go beyond the line (including newline)
+        // Note: x is visual index, but we assume 1 char = 1 index for now (UTF-8).
+        // Rope handles UTF-8 correctly.
+
+        // If x is past the end of the line (excluding newline), we clamp it?
+        // But insert needs to be able to append.
+
+        // If line ends with \n, valid x indices are 0..len-1 (for insertion before \n) ?
+        // Usually editors allow cursor to be at the newline char (which effectively appends to line).
+
+        // actually, Ropey::line includes \n.
+        // line_char_idx + pos.x.
+
+        // We verify that pos.x is valid for this line.
+        // Row len doesn't include \n.
+        // So pos.x <= row_len.
+
+        if pos.x + line_char_idx > self.content.len_chars() {
+            return self.content.len_chars();
+        }
+
+        line_char_idx + pos.x
     }
 
     pub fn get_substring(&self, start: &Position, end: &Position) -> String {
-        let (start, end) = if start.y < end.y || (start.y == end.y && start.x <= end.x) {
-            (start, end)
+        let start_idx = self.position_to_char_idx(start);
+        let end_idx = self.position_to_char_idx(end);
+        let (start_idx, end_idx) = if start_idx <= end_idx {
+            (start_idx, end_idx)
         } else {
-            (end, start)
+            (end_idx, start_idx)
         };
 
-        let mut result = String::new();
-        for y in start.y..=end.y {
-            if let Some(row) = self.rows.get(y) {
-                let start_x = if y == start.y { start.x } else { 0 };
-                let end_x = if y == end.y {
-                    end.x.min(row.len())
-                } else {
-                    row.len()
-                };
+        // Inclusive? get_substring usually implies range.
+        // Original implementation was inclusive of end column?
+        // Original: `take(end_x - start_x + 1)`. Yes inclusive.
+        // So we need end_idx + 1, but be careful of bounds.
 
-                if start_x < row.len() {
-                    let s: String = row
-                        .content
-                        .chars()
-                        .skip(start_x)
-                        .take(end_x - start_x + 1)
-                        .collect(); // Inclusive end
-                    result.push_str(&s);
-                }
-                if y < end.y {
-                    result.push('\n');
-                }
-            }
+        let len = self.content.len_chars();
+        let end_idx = (end_idx + 1).min(len);
+
+        if start_idx >= len {
+            return String::new();
         }
-        result
+
+        self.content.slice(start_idx..end_idx).to_string()
     }
 
     pub fn delete_range(&mut self, start: &Position, end: &Position) {
-        let (start, end) = if start.y < end.y || (start.y == end.y && start.x <= end.x) {
-            (start, end)
+        let start_idx = self.position_to_char_idx(start);
+        let end_idx = self.position_to_char_idx(end);
+        let (start_idx, end_idx) = if start_idx <= end_idx {
+            (start_idx, end_idx)
         } else {
-            (end, start)
+            (end_idx, start_idx)
         };
 
-        // Naive implementation: delete char by char from end to start to avoid index shifts affecting earlier content (though we are deletingrange so it matters less if we start from end)
-        // Better:
-        // 1. Delete part of first row
-        // 2. Remove intermediate rows
-        // 3. Delete part of last row and merge with first
+        // Inclusive delete logic matches get_substring?
+        // Original `delete` deleted char at cursor.
+        // `delete_range` deleted from start to end inclusive.
 
-        // Simple approach using existing delete:
-        // Moving cursor to 'end' is hard because text shifts.
-        // But if we delete from 'start', all subsequent chars shift left.
-        // So we can just repeatedly delete at 'start' until we reach 'end'.
-        // BUT 'end' position becomes invalid after first delete.
-        // So we need to calculate number of characters/lines to delete? No that's hard.
+        let len = self.content.len_chars();
+        let end_idx = (end_idx + 1).min(len);
 
-        // Let's rely on logic: We know exactly the range.
-        if start.y == end.y {
-            if let Some(row) = self.rows.get_mut(start.y) {
-                // Delete from start.x to end.x inclusive
-                for _ in start.x..=end.x {
-                    row.delete(start.x);
-                }
-            }
-        } else {
-            // Multi-line delete
-            // 1. Truncate start row
-            if let Some(row) = self.rows.get_mut(start.y) {
-                // Keep 0..start.x
-                let keep: String = row.content.chars().take(start.x).collect();
-                row.content = keep;
-                row.len = start.x; // Update len manually or via method? Row::From rebuilds?
-                // Row fields are private? No they are pub in my code?
-                // Oops Row len is private read but public in struct def?
-                // Let's check Row struct... it is `pub content` and `len`
-                // Let's use delete() in a loop for safety or add truncate?
-                // Let's Re-read row.rs content? No I wrote it.
-                // Let's use just `delete` from right?
-                // Actually, easy way:
-                // Construct new content for Start Row = StartRow[..start.x] + EndRow[end.x+1..]
-                // Delete all rows between start+1 and end (inclusive)
-            }
-
-            // Get content from end row
-            let end_row_remainder = if let Some(row) = self.rows.get(end.y) {
-                row.content.chars().skip(end.x + 1).collect::<String>()
-            } else {
-                String::new()
-            };
-
-            // Remove rows from start.y + 1 to end.y inclusive
-            // We need to remove end.y - (start.y + 1) + 1 rows
-            let num_to_remove = end.y - start.y;
-            for _ in 0..num_to_remove {
-                if start.y + 1 < self.rows.len() {
-                    self.rows.remove(start.y + 1);
-                }
-            }
-
-            // Append remainder to start row
-            if let Some(row) = self.rows.get_mut(start.y) {
-                let remainder_len = end_row_remainder.chars().count();
-                row.content.push_str(&end_row_remainder);
-                row.len += remainder_len;
-            }
+        if start_idx < len {
+            self.content.remove(start_idx..end_idx);
+            self.dirty = true;
         }
     }
 
@@ -247,90 +192,52 @@ impl Document {
             return None;
         }
 
-        let mut y = at.y;
+        let start_char_idx = self.position_to_char_idx(at);
+        let content_str = self.content.to_string(); // Converting whole rope to string is expensive but simplest for search now.
+        // Ropey doesn't have built-in search yet? It does have iterators.
+        // For efficiency we should iterate chunks, but for now `to_string` is acceptable for MVP migration.
 
-        // Forward Search
-        if direction == SearchDirection::Forward {
-            // 1. Search current line starting from at.x (+1 to avoid finding current char if it matches? usually find next means AFTER cursor)
-            // But if cursor is ON the match, 'n' should go to next.
-            // So we start searching from at.x + 1 usually?
-            // If I type /foo, and I am at start of file, I want to find foo at line 1.
-            // If I am ON foo, 'n' should find next foo.
-            // Let's assume 'at' is current cursor.
-            // We search from x. If match starts exactly at x, it counts as "found" (e.g. initial search).
-            // But for 'n' (Next), the editor logic usually advances x before calling find, OR find takes an arg "skip_current".
-            // Let's make find inclusive of 'at', and let Editor handle 'n' by passing at.x + 1.
-
-            let mut start_x = at.x;
-
-            for _ in 0..=self.len() {
-                if let Some(row) = self.rows.get(y) {
-                    // Find all occurrences in row
-                    // We need char indices
-                    let mut matches = Vec::new();
-                    for (byte_idx, _) in row.content.match_indices(query) {
-                        matches.push(row.content[..byte_idx].chars().count());
-                    }
-
-                    // Find first match >= start_x
-                    if let Some(&match_x) = matches.iter().find(|&&x| x >= start_x) {
-                        return Some(Position { x: match_x, y });
-                    }
-                }
-
-                y = (y + 1) % self.len();
-                start_x = 0; // For next lines, start from 0
-            }
-        } else {
-            // Backward Search
-            // 1. Search current line up to at.x
-            // logic: find max match_x such that match_x < at.x (strictly? usually yes for 'N' if we are on match)
-            // Or inclusive?
-            // For 'N', if we are on a match start, we want previous one.
-            // Let's assume exclusive upper bound?
-            // Let's verify: Editor will pass 'at'.
-            // If I am on match, 'N' should go back.
-            // So we look for matches < at.x
-
-            let mut limit_x = at.x; // We look for match_x < limit_x ?? 
-            // Actually, simply: If I am at 10, and match is at 10.
-            // N should go to occurrence before 10.
-            // So we strictly filter < at.x check?
-
-            // Wait, we iterate rows backwards.
-
-            for _ in 0..=self.len() {
-                if let Some(row) = self.rows.get(y) {
-                    let mut matches = Vec::new();
-                    for (byte_idx, _) in row.content.match_indices(query) {
-                        matches.push(row.content[..byte_idx].chars().count());
-                    }
-
-                    // Find last match < limit_x
-                    // Use simple filter
-                    // Note: if limit_x is None (conceptually infinity for other lines), we take max.
-
-                    // Logic:
-                    // If this is the START line (first iteration): find match < at.x
-                    // If this is NOT start line: find any match (max one)
-
-                    let candidate = if y == at.y && limit_x != usize::MAX {
-                        matches.iter().filter(|&&x| x < at.x).last()
-                    } else {
-                        matches.last()
-                    };
-
-                    if let Some(&match_x) = candidate {
-                        return Some(Position { x: match_x, y });
-                    }
-                }
-
-                if y == 0 {
-                    y = self.len().saturating_sub(1);
+        match direction {
+            SearchDirection::Forward => {
+                // Search from start_char_idx
+                if let Some(idx) = content_str[start_char_idx..].find(query) {
+                    let found_idx = start_char_idx + idx;
+                    // Convert back to Position
+                    let line_idx = self.content.char_to_line(found_idx);
+                    let line_start = self.content.line_to_char(line_idx);
+                    let x = found_idx - line_start;
+                    return Some(Position { x, y: line_idx });
                 } else {
-                    y -= 1;
+                    // Wrap around? Original implementation wrapped.
+                    if let Some(idx) = content_str.find(query) {
+                        let found_idx = idx;
+                        let line_idx = self.content.char_to_line(found_idx);
+                        let line_start = self.content.line_to_char(line_idx);
+                        let x = found_idx - line_start;
+                        return Some(Position { x, y: line_idx });
+                    }
                 }
-                limit_x = usize::MAX; // Reset limit for next lines
+            }
+            SearchDirection::Backward => {
+                // Search before start_char_idx
+                // find (forward) then filter? or rfind?
+                // `rfind` searches from right.
+                if let Some(idx) = content_str[..start_char_idx].rfind(query) {
+                    let found_idx = idx;
+                    let line_idx = self.content.char_to_line(found_idx);
+                    let line_start = self.content.line_to_char(line_idx);
+                    let x = found_idx - line_start;
+                    return Some(Position { x, y: line_idx });
+                } else {
+                    // Wrap around to end
+                    if let Some(idx) = content_str.rfind(query) {
+                        let found_idx = idx;
+                        let line_idx = self.content.char_to_line(found_idx);
+                        let line_start = self.content.line_to_char(line_idx);
+                        let x = found_idx - line_start;
+                        return Some(Position { x, y: line_idx });
+                    }
+                }
             }
         }
 
