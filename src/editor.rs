@@ -3,10 +3,10 @@ use crate::document::{Document, SearchDirection};
 use crate::terminal::Terminal;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 use std::io;
 use std::time::{Duration, Instant};
@@ -54,6 +54,10 @@ pub struct Editor {
     #[allow(dead_code)]
     config: Config,
     command_buffer: String,
+    // Auto-completion
+    completion_active: bool,
+    completion_index: usize,
+    completion_list: Vec<String>,
 }
 
 impl Editor {
@@ -86,6 +90,9 @@ impl Editor {
             clipboard,
             config,
             command_buffer: String::new(),
+            completion_active: false,
+            completion_index: 0,
+            completion_list: Vec::new(),
         }
     }
 
@@ -176,23 +183,27 @@ impl Editor {
                             .highlighting
                             .get(i)
                             .unwrap_or(&crate::row::HighlightType::None);
-                        let mut style = match highlight {
-                            crate::row::HighlightType::Number => {
-                                Style::default().fg(parse_hex_color(&self.config.theme.number))
-                            }
-                            crate::row::HighlightType::String => {
-                                Style::default().fg(parse_hex_color(&self.config.theme.string))
-                            }
-                            crate::row::HighlightType::Comment => {
-                                Style::default().fg(parse_hex_color(&self.config.theme.comment))
-                            }
-                            crate::row::HighlightType::Keyword => {
-                                Style::default().fg(parse_hex_color(&self.config.theme.keyword))
-                            }
-                            _ => {
-                                Style::default().fg(parse_hex_color(&self.config.theme.foreground))
-                            }
-                        };
+                        let mut style =
+                            match highlight {
+                                crate::row::HighlightType::Number => {
+                                    Style::default().fg(parse_hex_color(&self.config.theme.number))
+                                }
+                                crate::row::HighlightType::String => {
+                                    Style::default().fg(parse_hex_color(&self.config.theme.string))
+                                }
+                                crate::row::HighlightType::Comment => {
+                                    Style::default().fg(parse_hex_color(&self.config.theme.comment))
+                                }
+                                crate::row::HighlightType::Keyword => {
+                                    Style::default().fg(parse_hex_color(&self.config.theme.keyword))
+                                }
+                                crate::row::HighlightType::Type => Style::default()
+                                    .fg(parse_hex_color(&self.config.theme.type_color)),
+                                crate::row::HighlightType::ControlFlow => Style::default()
+                                    .fg(parse_hex_color(&self.config.theme.control_flow)),
+                                _ => Style::default()
+                                    .fg(parse_hex_color(&self.config.theme.foreground)),
+                            };
 
                         if self.mode == Mode::Visual {
                             if let Some(start_pos) = self.selection_start {
@@ -323,6 +334,47 @@ impl Editor {
             };
 
             f.render_widget(Paragraph::new(cmd_text), chunks[2]);
+
+            if self.completion_active && !self.completion_list.is_empty() {
+                let x_pos = chunks[0].x + gutter_width as u16 + cursor_x as u16;
+                let y_pos = chunks[0].y + cursor_y as u16 + 1;
+
+                let max_width = self
+                    .completion_list
+                    .iter()
+                    .map(|s| s.len())
+                    .max()
+                    .unwrap_or(10)
+                    .min(40) as u16
+                    + 4;
+                let height = self.completion_list.len().min(10) as u16 + 2;
+
+                let area = Rect::new(x_pos, y_pos, max_width, height);
+
+                let items: Vec<ListItem> = self
+                    .completion_list
+                    .iter()
+                    .enumerate()
+                    .map(|(i, text)| {
+                        let style = if i == self.completion_index {
+                            Style::default()
+                                .bg(parse_hex_color(&self.config.theme.selection_bg))
+                                .fg(parse_hex_color(&self.config.theme.foreground))
+                        } else {
+                            Style::default()
+                                .fg(parse_hex_color(&self.config.theme.foreground))
+                                .bg(parse_hex_color(&self.config.theme.background))
+                        };
+                        ListItem::new(Span::styled(text.clone(), style))
+                    })
+                    .collect();
+
+                let list = List::new(items)
+                    .block(Block::default().borders(Borders::ALL))
+                    .style(Style::default().bg(parse_hex_color(&self.config.theme.background)));
+
+                f.render_widget(list, area);
+            }
 
             if mode != Mode::Command && mode != Mode::Search {
                 f.set_cursor_position((
@@ -536,14 +588,22 @@ impl Editor {
 
     fn process_insert_mode(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.mode = Mode::Normal,
+            KeyCode::Esc => {
+                self.completion_active = false;
+                self.mode = Mode::Normal;
+            }
             KeyCode::Char(c) => {
                 self.document.insert(&self.cursor_position, c);
                 self.move_cursor(1, 0);
+                self.update_completion();
             }
             KeyCode::Enter => {
-                self.document.insert_newline(&self.cursor_position);
-                self.move_cursor_absolute(0, self.cursor_position.y + 1);
+                if self.completion_active {
+                    self.insert_completion();
+                } else {
+                    self.document.insert_newline(&self.cursor_position);
+                    self.move_cursor_absolute(0, self.cursor_position.y + 1);
+                }
             }
             KeyCode::Backspace => {
                 if self.cursor_position.x > 0 || self.cursor_position.y > 0 {
@@ -558,12 +618,49 @@ impl Editor {
                             self.document.delete(&self.cursor_position);
                         }
                     }
+                    self.update_completion();
+                }
+            }
+            KeyCode::Tab => {
+                if self.completion_active {
+                    self.insert_completion();
+                } else {
+                    let tab_size = self.config.editor.tab_size;
+                    for _ in 0..tab_size {
+                        self.document.insert(&self.cursor_position, ' ');
+                        self.move_cursor(1, 0);
+                    }
+                }
+            }
+            KeyCode::BackTab => {
+                // Future: implement unindent
+            }
+            KeyCode::Up => {
+                if self.completion_active {
+                    if self.completion_index > 0 {
+                        self.completion_index -= 1;
+                    } else {
+                        self.completion_index = self.completion_list.len() - 1;
+                    }
+                } else {
+                    self.move_cursor(0, -1);
+                }
+            }
+            KeyCode::Down => {
+                if self.completion_active {
+                    if !self.completion_list.is_empty() {
+                        if self.completion_index < self.completion_list.len() - 1 {
+                            self.completion_index += 1;
+                        } else {
+                            self.completion_index = 0;
+                        }
+                    }
+                } else {
+                    self.move_cursor(0, 1);
                 }
             }
             KeyCode::Left => self.move_cursor(-1, 0),
             KeyCode::Right => self.move_cursor(1, 0),
-            KeyCode::Up => self.move_cursor(0, -1),
-            KeyCode::Down => self.move_cursor(0, 1),
             _ => {}
         }
     }
@@ -730,6 +827,85 @@ impl Editor {
                 .saturating_sub(width)
                 .saturating_add(1);
         }
+    }
+
+    fn update_completion(&mut self) {
+        if let Some(row) = self.document.row(self.cursor_position.y) {
+            let col = self.cursor_position.x;
+            let chars: Vec<char> = row.content.chars().collect();
+            if col > chars.len() {
+                self.completion_active = false;
+                return;
+            }
+
+            let mut start = col;
+            while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+                start -= 1;
+            }
+            if start == col {
+                self.completion_active = false;
+                return;
+            }
+
+            let word: String = chars[start..col].iter().collect();
+            if word.len() < 1 {
+                self.completion_active = false;
+                return;
+            }
+
+            let mut options = Vec::new();
+            let syntax = &self.document.syntax;
+
+            let mut candidates: Vec<&str> = Vec::new();
+            candidates.extend_from_slice(syntax.keywords);
+            candidates.extend_from_slice(syntax.types);
+            candidates.extend_from_slice(syntax.control_flow);
+
+            for cand in candidates {
+                if cand.starts_with(&word) && cand != &word {
+                    options.push(cand.to_string());
+                }
+            }
+            options.sort();
+            options.dedup();
+            options.truncate(10);
+
+            if options.is_empty() {
+                self.completion_active = false;
+            } else {
+                self.completion_active = true;
+                self.completion_list = options;
+                self.completion_index = 0;
+            }
+        }
+    }
+
+    fn insert_completion(&mut self) {
+        if !self.completion_active || self.completion_list.is_empty() {
+            return;
+        }
+
+        let completion = self.completion_list[self.completion_index].clone();
+
+        if let Some(row) = self.document.row(self.cursor_position.y) {
+            let col = self.cursor_position.x;
+            let chars: Vec<char> = row.content.chars().collect();
+            let mut start = col;
+            while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+                start -= 1;
+            }
+
+            let end = self.cursor_position;
+            let start_pos = Position { x: start, y: end.y };
+            self.document.delete_range(&start_pos, &end);
+            self.cursor_position = start_pos;
+
+            for c in completion.chars() {
+                self.document.insert(&self.cursor_position, c);
+                self.move_cursor(1, 0);
+            }
+        }
+        self.completion_active = false;
     }
 }
 

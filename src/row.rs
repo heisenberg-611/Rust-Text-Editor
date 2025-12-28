@@ -3,6 +3,8 @@ pub enum HighlightType {
     None,
     Number,
     Keyword,
+    Type,
+    ControlFlow,
     String,
     Comment,
 }
@@ -130,50 +132,42 @@ impl Row {
                 self.highlighting[i] = HighlightType::Number;
             }
 
-            // Keyword detection
-            let keywords = syntax.keywords;
-            for &kw in keywords {
-                let kw_chars: Vec<char> = kw.chars().collect();
-                if i + kw_chars.len() <= chars.len() {
-                    // Check match
-                    let matches = chars[i..i + kw_chars.len()]
-                        .iter()
-                        .zip(kw_chars.iter())
-                        .all(|(a, b)| a == b);
-                    if matches {
-                        // Check boundaries
-                        let before_ok =
-                            i == 0 || !chars[i - 1].is_alphanumeric() && chars[i - 1] != '_';
-                        let after_ok = i + kw_chars.len() == chars.len()
-                            || !chars[i + kw_chars.len()].is_alphanumeric()
-                                && chars[i + kw_chars.len()] != '_';
+            // Token detection (Keywords, Types, ControlFlow)
+            let mut matched_token = false;
+            for (tokens, highlight_type) in [
+                (syntax.types, HighlightType::Type),
+                (syntax.control_flow, HighlightType::ControlFlow),
+                (syntax.keywords, HighlightType::Keyword),
+            ] {
+                for &token in tokens {
+                    let token_chars: Vec<char> = token.chars().collect();
+                    if i + token_chars.len() <= chars.len() {
+                        let matches = chars[i..i + token_chars.len()]
+                            .iter()
+                            .zip(token_chars.iter())
+                            .all(|(a, b)| a == b);
 
-                        if before_ok && after_ok {
-                            for j in 0..kw_chars.len() {
-                                self.highlighting[i + j] = HighlightType::Keyword;
+                        if matches {
+                            // Check boundaries (must be separated by non-alphanumeric, except '_')
+                            let before_ok =
+                                i == 0 || !chars[i - 1].is_alphanumeric() && chars[i - 1] != '_';
+                            let after_ok = i + token_chars.len() == chars.len()
+                                || !chars[i + token_chars.len()].is_alphanumeric()
+                                    && chars[i + token_chars.len()] != '_';
+
+                            if before_ok && after_ok {
+                                for j in 0..token_chars.len() {
+                                    self.highlighting[i + j] = highlight_type;
+                                }
+                                i += token_chars.len() - 1;
+                                matched_token = true;
+                                break;
                             }
-                            // Don't advance immediately based on keyword length to avoid issues?
-                            // Actually we should advance.
-                            // But wait, the outer loop advances 1.
-                            // If we match, we should skip
-                            // But my loop is `while i < len`.
-                            // So I can advance `i` here.
-
-                            // NOTE: I cannot modify `i` and `continue` easily without affecting loop structure if I don't handle it carefully.
-                            // Let's just break the keyword loop and let logic handle it?
-                            // If I found a keyword, I highlighted it. I should assume I processed these chars.
-
-                            // Let's store finding.
-                            i += kw_chars.len() - 1; // -1 because loop does i++
-                            // break inner loop
-                            // wait, `continue` here continues `for` loop?
-                            // I want to continue `while` loop.
-                            // labeled break/continue?
-                            // Rust supports loop labels.
-                            // I'll use a boolean.
-                            break; // break keyword loop
                         }
                     }
+                }
+                if matched_token {
+                    break;
                 }
             }
 

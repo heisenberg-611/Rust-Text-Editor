@@ -46,6 +46,10 @@ pub struct ThemeConfig {
     pub comment: String,
     #[serde(default = "default_number")]
     pub number: String,
+    #[serde(default = "default_type_color")]
+    pub type_color: String,
+    #[serde(default = "default_control_flow")]
+    pub control_flow: String,
 }
 
 impl Default for Config {
@@ -81,6 +85,8 @@ impl Default for ThemeConfig {
             string: "#98c379".into(),
             comment: "#5c6370".into(),
             number: "#d19a66".into(),
+            type_color: "#e5c07b".into(),
+            control_flow: "#c678dd".into(),
         }
     }
 }
@@ -126,6 +132,12 @@ fn default_comment() -> String {
 }
 fn default_number() -> String {
     "#d19a66".to_string()
+}
+fn default_type_color() -> String {
+    "#e5c07b".to_string()
+}
+fn default_control_flow() -> String {
+    "#c678dd".to_string()
 }
 
 impl Config {

@@ -2,6 +2,8 @@ pub struct Syntax {
     pub file_type: &'static str,
     pub file_extensions: &'static [&'static str],
     pub keywords: &'static [&'static str],
+    pub types: &'static [&'static str],
+    pub control_flow: &'static [&'static str],
     pub single_line_comment: &'static str,
 }
 
@@ -11,6 +13,8 @@ impl Default for Syntax {
             file_type: "Text",
             file_extensions: &[],
             keywords: &[],
+            types: &[],
+            control_flow: &[],
             single_line_comment: "",
         }
     }
@@ -38,6 +42,8 @@ static DEFAULT_SYNTAX: Syntax = Syntax {
     file_type: "Text",
     file_extensions: &[],
     keywords: &[],
+    types: &[],
+    control_flow: &[],
     single_line_comment: "",
 };
 
@@ -52,6 +58,13 @@ static SYNTAX_LIST: &[Syntax] = &[
             "None", "Some", "Ok", "Err",
         ],
         single_line_comment: "//",
+        types: &[
+            "bool", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64", "char",
+            "str", "String", "Vec", "Option", "Result", "Self",
+        ],
+        control_flow: &[
+            "match", "if", "else", "for", "while", "loop", "return", "break", "continue",
+        ],
     },
     Syntax {
         file_type: "C",
@@ -62,6 +75,24 @@ static SYNTAX_LIST: &[Syntax] = &[
             "float", "char", "unsigned", "signed", "void", "NULL",
         ],
         single_line_comment: "//",
+        types: &[
+            "char",
+            "double",
+            "float",
+            "int",
+            "long",
+            "short",
+            "signed",
+            "unsigned",
+            "void",
+            "_Bool",
+            "_Complex",
+            "_Imaginary",
+        ],
+        control_flow: &[
+            "break", "case", "continue", "default", "do", "else", "for", "goto", "if", "return",
+            "switch", "while",
+        ],
     },
     Syntax {
         file_type: "C++",
@@ -104,6 +135,14 @@ static SYNTAX_LIST: &[Syntax] = &[
             "NULL",
         ],
         single_line_comment: "//",
+        types: &[
+            "bool", "char", "double", "float", "int", "long", "short", "signed", "unsigned",
+            "void", "wchar_t",
+        ],
+        control_flow: &[
+            "break", "case", "catch", "continue", "default", "do", "else", "for", "goto", "if",
+            "return", "switch", "throw", "try", "while",
+        ],
     },
     Syntax {
         file_type: "Java",
@@ -145,6 +184,14 @@ static SYNTAX_LIST: &[Syntax] = &[
             "null",
         ],
         single_line_comment: "//",
+        types: &[
+            "boolean", "byte", "char", "double", "float", "int", "long", "short", "void", "String",
+            "Integer", "Double",
+        ],
+        control_flow: &[
+            "break", "case", "catch", "continue", "default", "do", "else", "for", "goto", "if",
+            "return", "switch", "throw", "try", "while",
+        ],
     },
     Syntax {
         file_type: "JavaScript",
@@ -183,6 +230,14 @@ static SYNTAX_LIST: &[Syntax] = &[
             "undefined",
         ],
         single_line_comment: "//",
+        types: &[
+            "boolean", "byte", "char", "double", "float", "int", "long", "short", "void", "any",
+            "string", "number", "Array", "Object",
+        ],
+        control_flow: &[
+            "await", "break", "case", "catch", "continue", "default", "do", "else", "finally",
+            "for", "if", "return", "switch", "throw", "try", "while",
+        ],
     },
     Syntax {
         file_type: "Python",
@@ -193,5 +248,11 @@ static SYNTAX_LIST: &[Syntax] = &[
             "global", "nonlocal", "True", "False", "None", "and", "or", "not", "is", "in",
         ],
         single_line_comment: "#",
+        types: &[
+            "bool", "int", "float", "str", "list", "dict", "set", "tuple", "None", "True", "False",
+        ],
+        control_flow: &[
+            "break", "continue", "else", "for", "if", "raise", "return", "try", "while",
+        ],
     },
 ];
