@@ -160,131 +160,91 @@ impl Editor {
                         spans.push(Span::styled(gutter_str, default_style));
                     }
 
-                    let row_content = row.render(offset_x, offset_x + text_width);
+                    let mut current_x = 0;
+                    let mut current_style = Style::default();
+                    let mut current_span_content = String::new();
 
-                    if self.mode == Mode::Visual {
-                        if let Some(start_pos) = self.selection_start {
-                            let (start, end) = if start_pos.y < self.cursor_position.y
-                                || (start_pos.y == self.cursor_position.y
-                                    && start_pos.x <= self.cursor_position.x)
-                            {
-                                (start_pos, self.cursor_position)
-                            } else {
-                                (self.cursor_position, start_pos)
-                            };
+                    for (i, c) in row.content.chars().enumerate() {
+                        if current_x < offset_x {
+                            current_x += 1;
+                            continue;
+                        }
+                        if current_x >= offset_x + text_width {
+                            break;
+                        }
 
-                            let current_row_idx = file_row;
-                            if current_row_idx < start.y || current_row_idx > end.y {
-                                spans.push(Span::raw(row_content));
-                            } else {
-                                // This row is part of the selection range
-                                let row_len = row.len();
-                                let _sel_start_x = if current_row_idx == start.y {
-                                    start.x
+                        let highlight = row
+                            .highlighting
+                            .get(i)
+                            .unwrap_or(&crate::row::HighlightType::None);
+                        let mut style = match highlight {
+                            crate::row::HighlightType::Number => {
+                                Style::default().fg(parse_hex_color(&self.config.theme.number))
+                            }
+                            crate::row::HighlightType::String => {
+                                Style::default().fg(parse_hex_color(&self.config.theme.string))
+                            }
+                            crate::row::HighlightType::Comment => {
+                                Style::default().fg(parse_hex_color(&self.config.theme.comment))
+                            }
+                            crate::row::HighlightType::Keyword => {
+                                Style::default().fg(parse_hex_color(&self.config.theme.keyword))
+                            }
+                            _ => {
+                                Style::default().fg(parse_hex_color(&self.config.theme.foreground))
+                            }
+                        };
+
+                        if self.mode == Mode::Visual {
+                            if let Some(start_pos) = self.selection_start {
+                                let (start, end) = if start_pos.y < self.cursor_position.y
+                                    || (start_pos.y == self.cursor_position.y
+                                        && start_pos.x <= self.cursor_position.x)
+                                {
+                                    (start_pos, self.cursor_position)
                                 } else {
-                                    0
+                                    (self.cursor_position, start_pos)
                                 };
-                                let _sel_end_x = if current_row_idx == end.y {
-                                    end.x.min(row_len)
+
+                                let is_selected = if file_row > start.y && file_row < end.y {
+                                    true
+                                } else if file_row == start.y && file_row == end.y {
+                                    current_x >= start.x && current_x <= end.x
+                                } else if file_row == start.y {
+                                    current_x >= start.x
+                                } else if file_row == end.y {
+                                    current_x <= end.x
                                 } else {
-                                    row_len
+                                    false
                                 };
 
-                                // Adjust for viewport offset
-                                // let _render_start_x = sel_start_x.saturating_sub(offset_x);
-                                // let _render_end_x = sel_end_x.saturating_sub(offset_x);
-
-                                // We need to split row_content string into chars to handle multibyte correctly and indices
-                                // Ideally we would work with byte indices or char indices from row.render
-                                // For simplicity, let's just highlight the whole line if fully selected,
-                                // or try to substring. Note: row.render returns a substring of the content.
-
-                                // Let's iterate chars of render result
-                                let mut current_x = offset_x;
-                                let mut normal_before = String::new();
-                                let mut selected = String::new();
-                                let mut normal_after = String::new();
-
-                                for c in row.content.chars() {
-                                    if current_x >= offset_x + width {
-                                        break;
-                                    }
-                                    if current_x >= offset_x {
-                                        // Visible char
-                                        let is_selected = if current_row_idx > start.y
-                                            && current_row_idx < end.y
-                                        {
-                                            true
-                                        } else if current_row_idx == start.y
-                                            && current_row_idx == end.y
-                                        {
-                                            current_x >= start.x && current_x <= end.x
-                                        // Inclusive end for cursor feel? Standard VIM is usually exclusive on end or inclusive depending on settings. Let's do inclusive of cursor.
-                                        } else if current_row_idx == start.y {
-                                            current_x >= start.x
-                                        } else if current_row_idx == end.y {
-                                            current_x <= end.x
-                                        } else {
-                                            false
-                                        };
-
-                                        if is_selected {
-                                            selected.push(c);
-                                        } else if !selected.is_empty() && normal_after.is_empty() {
-                                            normal_after.push(c);
-                                        } else if selected.is_empty() {
-                                            normal_before.push(c);
-                                        } else {
-                                            normal_after.push(c);
-                                        }
-                                    }
-                                    current_x += 1;
-                                }
-
-                                if !normal_before.is_empty() {
-                                    spans.push(Span::styled(
-                                        normal_before,
-                                        Style::default()
-                                            .fg(parse_hex_color(&self.config.theme.foreground)),
-                                    ));
-                                }
-                                if !selected.is_empty() {
-                                    spans.push(Span::styled(
-                                        selected,
-                                        Style::default()
-                                            .bg(parse_hex_color(&self.config.theme.selection_bg))
-                                            .fg(parse_hex_color(&self.config.theme.foreground)),
-                                    ));
-                                }
-                                if !normal_after.is_empty() {
-                                    spans.push(Span::styled(
-                                        normal_after,
-                                        Style::default()
-                                            .fg(parse_hex_color(&self.config.theme.foreground)),
-                                    ));
-                                }
-
-                                // Fallback if logic failed (e.g empty selection that implies cursor pos)
-                                if spans.is_empty() {
-                                    spans.push(Span::styled(
-                                        row_content,
-                                        Style::default()
-                                            .fg(parse_hex_color(&self.config.theme.foreground)),
-                                    ));
+                                if is_selected {
+                                    style =
+                                        style.bg(parse_hex_color(&self.config.theme.selection_bg));
                                 }
                             }
-                        } else {
-                            spans.push(Span::styled(
-                                row_content,
-                                Style::default().fg(parse_hex_color(&self.config.theme.foreground)),
-                            ));
                         }
-                    } else {
-                        spans.push(Span::styled(
-                            row_content,
-                            Style::default().fg(parse_hex_color(&self.config.theme.foreground)),
-                        ));
+
+                        if i == 0 || style != current_style {
+                            if !current_span_content.is_empty() {
+                                spans.push(Span::styled(
+                                    current_span_content.clone(),
+                                    current_style,
+                                ));
+                            }
+                            current_style = style;
+                            current_span_content = c.to_string();
+                        } else {
+                            current_span_content.push(c);
+                        }
+
+                        current_x += 1;
                     }
+
+                    if !current_span_content.is_empty() {
+                        spans.push(Span::styled(current_span_content, current_style));
+                    }
+
                     lines.push(Line::from(spans));
                 }
             } else if file_row == doc_len && doc_len == 0 {
@@ -342,8 +302,8 @@ impl Editor {
             );
             let status_bar = Paragraph::new(status_text).style(
                 Style::default()
-                    .bg(parse_hex_color(&self.config.theme.selection_bg))
-                    .fg(parse_hex_color(&self.config.theme.foreground)),
+                    .bg(parse_hex_color(&self.config.theme.status_bg))
+                    .fg(parse_hex_color(&self.config.theme.status_fg)),
             );
             f.render_widget(status_bar, chunks[1]);
 

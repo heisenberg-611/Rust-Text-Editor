@@ -18,6 +18,8 @@ pub struct EditorConfig {
     pub line_numbers: bool,
     #[serde(default = "default_mouse_support")]
     pub mouse_support: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -31,16 +33,25 @@ pub struct ThemeConfig {
     pub cursor: String,
     #[serde(default = "default_selection_bg")]
     pub selection_bg: String,
+    #[serde(default = "default_status_bg")]
+    pub status_bg: String,
+    #[serde(default = "default_status_fg")]
+    pub status_fg: String,
+    // Syntax highlighting
+    #[serde(default = "default_keyword")]
+    pub keyword: String,
+    #[serde(default = "default_string")]
+    pub string: String,
+    #[serde(default = "default_comment")]
+    pub comment: String,
+    #[serde(default = "default_number")]
+    pub number: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            editor: EditorConfig {
-                 tab_size: 4,
-                 line_numbers: true,
-                 mouse_support: true,
-            },
+            editor: EditorConfig::default(),
             theme: ThemeConfig::default(),
         }
     }
@@ -52,6 +63,7 @@ impl Default for EditorConfig {
             tab_size: 4,
             line_numbers: true,
             mouse_support: true,
+            theme: "default".into(),
         }
     }
 }
@@ -63,29 +75,78 @@ impl Default for ThemeConfig {
             foreground: "#ffffff".into(),
             cursor: "#cccccc".into(),
             selection_bg: "#3e4451".into(),
+            status_bg: "#3e4451".into(),
+            status_fg: "#ffffff".into(),
+            keyword: "#c678dd".into(),
+            string: "#98c379".into(),
+            comment: "#5c6370".into(),
+            number: "#d19a66".into(),
         }
     }
 }
 
-fn default_tab_size() -> usize { 4 }
-fn default_line_numbers() -> bool { true }
-fn default_mouse_support() -> bool { true }
-fn default_background() -> String { "#1e1e1e".to_string() }
-fn default_foreground() -> String { "#ffffff".to_string() }
-fn default_cursor() -> String { "#cccccc".to_string() }
-fn default_selection_bg() -> String { "#3e4451".to_string() }
+fn default_tab_size() -> usize {
+    4
+}
+fn default_line_numbers() -> bool {
+    true
+}
+fn default_mouse_support() -> bool {
+    true
+}
+fn default_theme() -> String {
+    "default".to_string()
+}
+fn default_background() -> String {
+    "#1e1e1e".to_string()
+}
+fn default_foreground() -> String {
+    "#ffffff".to_string()
+}
+fn default_cursor() -> String {
+    "#cccccc".to_string()
+}
+fn default_selection_bg() -> String {
+    "#3e4451".to_string()
+}
+fn default_status_bg() -> String {
+    "#3e4451".to_string()
+}
+fn default_status_fg() -> String {
+    "#ffffff".to_string()
+}
+fn default_keyword() -> String {
+    "#c678dd".to_string()
+}
+fn default_string() -> String {
+    "#98c379".to_string()
+}
+fn default_comment() -> String {
+    "#5c6370".to_string()
+}
+fn default_number() -> String {
+    "#d19a66".to_string()
+}
 
 impl Config {
     pub fn load() -> Self {
         // Try to load from .config/config.toml
         let config_path = Path::new(".config/config.toml");
-        if config_path.exists() {
+        let mut config = if config_path.exists() {
             if let Ok(content) = fs::read_to_string(config_path) {
-                if let Ok(config) = toml::from_str(&content) {
-                    return config;
-                }
+                toml::from_str(&content).unwrap_or_else(|_| Config::default())
+            } else {
+                Config::default()
             }
+        } else {
+            Config::default()
+        };
+
+        // If a specific theme is requested, load it
+        if config.editor.theme != "default" {
+            config.theme = crate::theme::load_theme(&config.editor.theme);
         }
-        Config::default()
+
+        config
     }
 }

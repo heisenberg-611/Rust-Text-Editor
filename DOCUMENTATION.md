@@ -78,7 +78,6 @@ Meow is a **modal** editor. This means keys behave differently depending on the 
 ---
 
 ## 3. Configuration
-
 Meow looks for a configuration file at `.config/config.toml` in the project directory (or working directory).
 
 ### Example `config.toml`
@@ -87,14 +86,33 @@ Meow looks for a configuration file at `.config/config.toml` in the project dire
 tab_size = 4
 line_numbers = true
 mouse_support = true
+theme = "dracula" # See available themes below
 
 [theme]
-# Hex color codes (RRGGBB)
-background = "#282c34"   # Main editor background
-foreground = "#abb2bf"   # Default text color
-cursor = "#528bff"       # Cursor color
-selection_bg = "#3e4451" # Background color for selected text
+# (Optional) Overrides for specific colors if "theme" is set to "default" or left empty.
+background = "#282c34"
+foreground = "#abb2bf"
+cursor = "#528bff"
+selection_bg = "#3e4451"
 ```
+
+### Available Themes
+You can set `theme` in `config.toml` to one of the following:
+- `default` (uses colors defined in `[theme]` section)
+- `dracula`
+- `nord`
+- `catppuccin_mocha`
+- `catppuccin_latte`
+- `gruvbox_dark`
+- `gruvbox_light`
+- `onedark`
+- `monokai`
+- `solarized_dark`
+- `solarized_light`
+- `tokyonight`
+- `ayu_mirage`
+
+Themes are loaded from `.config/themes/` if they exist as TOML files.
 
 ### Status Bar Info
 -   **Mode Indicator**: Shows current editor mode.
@@ -132,7 +150,30 @@ The codebase is organized into modular components.
 
 ---
 
-## 5. Troubleshooting & FAQ
+## 5. Extending the Editor
+
+This section describes how to add support for new features.
+
+### Adding Syntax Highlighting for a New Language
+
+1.  Open `src/syntax.rs`.
+2.  Add a new entry to the `SYNTAX_LIST` array.
+3.  Define the following properties:
+    ```rust
+    Syntax {
+        file_type: "YourLanguage",
+        file_extensions: &["ext"], // e.g. ["rb", "ruby"]
+        keywords: &[
+             "keyword1", "keyword2" // Add language keywords here
+        ],
+        single_line_comment: "#", // The comment starter string
+    },
+    ```
+4.  Rebuild the editor: `cargo install --path .`
+
+---
+
+## 6. Troubleshooting & FAQ
 
 ### "Command not found: meow"
 -   **Cause**: `~/.cargo/bin` is not in your PATH.

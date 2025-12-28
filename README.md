@@ -21,6 +21,8 @@ A modal text editor inspired by Neovim, built with Rust.
 - **Vim-like Keybindings**: `hjkl` navigation, `i` for insert, `v` for visual, `:w`, `:q` commands.
 - **Clipboard Integration**: Copy (`y`) and Paste (`p`) using system clipboard.
 - **Mouse Support**: Click to move cursor.
+- **Extensive Themes**: 12+ built-in themes (Dracula, Nord, Catppuccin, etc.) with external file support.
+- **Syntax Highlighting**: Auto-detection for Rust, C, C++, Java, JS/TS, and Python.
 - **Configuration**: Customizable via `.config/config.toml`.
 - **Performance**: Built with `ratatui` and `crossterm` for high-performance TUI.
 
@@ -62,6 +64,7 @@ The editor looks for a configuration file at `.config/config.toml` (relative to 
 [editor]
 line_numbers = true
 mouse_support = true
+theme = "dracula" # Set your preferred theme here
 
 [theme]
 background = "#1e1e1e"
