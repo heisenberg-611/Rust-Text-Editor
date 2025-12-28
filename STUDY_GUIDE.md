@@ -85,6 +85,7 @@ Terminals usually line-buffer input (wait for Enter). Meow uses **Raw Mode**:
 
 ### 3.5. Configuration & Themes
 *   **Global Config**: Checks `~/.config/meow/config.toml`.
+    *   Setup: `cp config.toml ~/.config/meow/config.toml`
 *   **Themes**: TOML files defining color palettes. The editor parses hex codes (e.g., `#ff0000`) and converts them to `Rgb` colors for the terminal.
 
 ---

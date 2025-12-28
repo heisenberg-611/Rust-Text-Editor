@@ -99,6 +99,10 @@ When in **Insert Mode**, typing characters triggers a popup list of suggestions 
 
 ## 3. Configuration
 Meow looks for a configuration file at `~/.config/meow/config.toml` (recommended) or `.config/config.toml` in the current working directory.
+To set this up, run:
+```bash
+cp config.toml ~/.config/meow/config.toml
+```
 Themes are loaded from `~/.config/meow/themes/` or locally from `.config/themes/`.
 
 ### Example `config.toml`
