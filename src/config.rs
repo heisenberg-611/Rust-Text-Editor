@@ -1,6 +1,7 @@
 use serde::Deserialize;
+use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
@@ -142,10 +143,18 @@ fn default_control_flow() -> String {
 
 impl Config {
     pub fn load() -> Self {
-        // Try to load from .config/config.toml
-        let config_path = Path::new(".config/config.toml");
+        // Try to load from ~/.config/meow/config.toml
+        let mut config_path = PathBuf::from(".config/config.toml"); // Fallback default
+
+        if let Ok(home) = env::var("HOME") {
+            let global_path = Path::new(&home).join(".config/meow/config.toml");
+            if global_path.exists() {
+                config_path = global_path;
+            }
+        }
+
         let mut config = if config_path.exists() {
-            if let Ok(content) = fs::read_to_string(config_path) {
+            if let Ok(content) = fs::read_to_string(&config_path) {
                 toml::from_str(&content).unwrap_or_else(|_| Config::default())
             } else {
                 Config::default()

@@ -66,7 +66,7 @@ A modal text editor inspired by Neovim, built with Rust.
 
 ## Customization
 
-The editor looks for a configuration file at `.config/config.toml` (relative to the working directory).
+The editor looks for a configuration file at `~/.config/meow/config.toml` (global) or `.config/config.toml` (local override).
 
 ### Default Configuration
 

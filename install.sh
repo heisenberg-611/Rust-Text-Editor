@@ -10,7 +10,34 @@ echo "Installing Meow Text Editor..."
 echo "Running 'cargo install --path .' ..."
 cargo install --path .
 
-# 2. Check if ~/.cargo/bin is in PATH
+# 2. Set up global configuration
+CONFIG_DIR="$HOME/.config/meow"
+THEMES_DIR="$CONFIG_DIR/themes"
+
+echo "Setting up configuration in $CONFIG_DIR..."
+mkdir -p "$THEMES_DIR"
+
+# Copy main config if it doesn't exist
+if [ ! -f "$CONFIG_DIR/config.toml" ]; then
+    if [ -f ".config/config.toml" ]; then
+        cp ".config/config.toml" "$CONFIG_DIR/config.toml"
+        echo "Copied config.toml to $CONFIG_DIR"
+    else
+        echo "Warning: .config/config.toml not found, skipping copy."
+    fi
+else
+    echo "Config file already exists in $CONFIG_DIR, skipping overwrite."
+fi
+
+# Copy themes
+if [ -d ".config/themes" ]; then
+    cp .config/themes/*.toml "$THEMES_DIR/"
+    echo "Copied themes to $THEMES_DIR"
+else
+     echo "Warning: .config/themes directory not found."
+fi
+
+# 3. Check if ~/.cargo/bin is in PATH
 CARGO_BIN="$HOME/.cargo/bin"
 
 if [[ ":$PATH:" != *":$CARGO_BIN:"* ]]; then

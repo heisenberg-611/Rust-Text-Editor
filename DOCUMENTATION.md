@@ -98,7 +98,8 @@ When in **Insert Mode**, typing characters triggers a popup list of suggestions 
 ---
 
 ## 3. Configuration
-Meow looks for a configuration file at `.config/config.toml` in the project directory (or working directory).
+Meow looks for a configuration file at `~/.config/meow/config.toml` (recommended) or `.config/config.toml` in the current working directory.
+Themes are loaded from `~/.config/meow/themes/` or locally from `.config/themes/`.
 
 ### Example `config.toml`
 ```toml
