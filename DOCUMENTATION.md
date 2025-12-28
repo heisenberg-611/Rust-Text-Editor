@@ -11,13 +11,23 @@ You must have **Rust** and **Cargo** installed.
 -   **Install Rust**: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
 ### Installing `meow`
+
+**Option 1: Automatic Installation (Recommended)**
+Run the included installation script to build, install, and configure your PATH automatically:
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+**Option 2: Manual Installation**
 Run the following command in the project root to install `meow` to your cargo bin directory:
 
 ```bash
 cargo install --path .
 ```
 
-*Note: Ensure `~/.cargo/bin` is in your system's PATH.*
+*Note: You must ensure `~/.cargo/bin` is in your system's PATH if you choose manual installation.*
 
 ### Platforms
 -   **macOS**: Supported & Tested.
@@ -187,7 +197,7 @@ This section describes how to add support for new features.
 
 ### "Command not found: meow"
 -   **Cause**: `~/.cargo/bin` is not in your PATH.
--   **Fix**: Run `export PATH="$HOME/.cargo/bin:$PATH"` or add it to your shell profile (`.zshrc` / `.bashrc`).
+-   **Fix**: Run `./install.sh` to fix this automatically, or manually add `export PATH="$HOME/.cargo/bin:$PATH"` to your shell profile.
 
 ### Text Rendering Weirdness
 -   **Cause**: Multibyte characters (emojis) or tab widths.
