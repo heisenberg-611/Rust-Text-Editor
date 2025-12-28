@@ -199,6 +199,6 @@ This section describes how to add support for new features.
 
 ### How to Uninstall
 ```bash
-cargo uninstall text-editor
+cargo uninstall Rust-text-editor
 ```
 （If installed via `cargo install --path .`, the package name defaults to the one in `Cargo.toml`).
