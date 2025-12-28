@@ -57,7 +57,7 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         let args: Vec<String> = std::env::args().collect();
         let mut document = Document::default();
         if let Some(filename) = args.get(1) {
@@ -69,7 +69,6 @@ impl Editor {
             }
         }
 
-        let config = Config::load();
         let clipboard = arboard::Clipboard::new().ok();
 
         Self {
@@ -294,9 +293,10 @@ impl Editor {
                 Mode::Search => "SEARCH",
             };
             let status_text = format!(
-                " {} | {} | Lines: {} | Bytes: {}",
+                " {} | {} | {} | Lines: {} | Bytes: {}",
                 mode_str,
                 filename,
+                self.document.syntax.file_type,
                 doc_len,
                 self.document.size_bytes()
             );

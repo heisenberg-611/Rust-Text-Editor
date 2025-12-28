@@ -6,9 +6,11 @@ mod syntax;
 mod terminal;
 mod theme;
 
+use config::Config;
 use editor::Editor;
 
 fn main() {
-    let mut editor = Editor::new();
+    let config = Config::load();
+    let mut editor = Editor::new(config);
     editor.run();
 }

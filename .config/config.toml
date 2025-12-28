@@ -1,9 +1,12 @@
 [editor]
+tab_size = 4
 line_numbers = true
 mouse_support = true
+theme = "monokai"    # See available themes below
 
 [theme]
-background = "#3e3d3dff"
-foreground = "#ffffff"
-cursor = "#cccccc"
+# (Optional) Overrides for specific colors if "theme" is set to "default" or left empty.
+background = "#282c34"
+foreground = "#abb2bf"
+cursor = "#528bff"
 selection_bg = "#3e4451"
