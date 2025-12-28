@@ -118,4 +118,4 @@ selection_bg = "#3e4451"
 - `:q`: Quit (unsaved changes will be lost immediately in this version).
 - `:wq`: Save and Quit.
 
-Open [DOCUMENTATION.md](https://github.com/heisenberg-611/Rust-Text-Editor/blob/master/DOCUMENTATION.md) for more information.
+Open [DOCUMENTATION.md](DOCUMENTATION.md) for user docs, or [STUDY_GUIDE.md](STUDY_GUIDE.md) for a deep dive architectural manual.
