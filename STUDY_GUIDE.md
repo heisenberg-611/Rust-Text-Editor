@@ -70,11 +70,12 @@ This is the "brain" of the application.
     ```
 
 ### 3.3. Text Management (`document.rs` & `row.rs`)
-Meow doesn't store text as one giant string. Instead, it uses a **Vector of Rows** (`Vec<Row>`).
-*   **Row**: A single line of text. It contains the raw string (`content`) and helper properties for rendering.
+Meow uses a **Rope** data structure (specifically the `ropey` crate) to manage text efficiently.
+*   **Rope**: A tree-based data structure that allows for O(log N) insertions and deletions, making it much faster than a standard String or Vector of lines for large files.
+*   **Row**: For rendering, the editor slices the Rope into lines.
 *   **Operations**:
-    *   `insert(position, char)`: Inserts a character at a specific x, y coordinate.
-    *   `delete(position)`: Removes character. Handles merging lines when detecting backspace at the start of a line.
+    *   `insert(position, char)`: Inserts a character into the Rope at the calculated byte index.
+    *   `delete(position)`: Removes a character or range from the Rope. The Rope handles line merging automatically.
 
 ### 3.4. The View Layer (`terminal.rs` & `ratatui`)
 Terminals usually line-buffer input (wait for Enter). Meow uses **Raw Mode**:
@@ -134,7 +135,7 @@ Implements a linear search:
 
 ## 6. Future Roadmap
 Potential areas for study and improvement:
-*   **Rope Data Structure**: Use a Rope instead of `Vec<Row>` for better performance with huge files.
+
 *   **LSP Support**: Integrate with Language Servers for real auto-completion and error checking.
 *   **Tree-sitter**: Used for more robust parsing-based syntax highlighting.
 

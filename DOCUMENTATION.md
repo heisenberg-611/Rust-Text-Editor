@@ -154,7 +154,7 @@ The codebase is organized into modular components.
     -   `process_keypress`: Handles inputs based on active Mode.
     -   `refresh_screen`: Orchestrates rendering to the TUI.
 -   **`src/document.rs`**: Manages the text buffer.
-    -   `Document` struct: A vector of `Row`s.
+    -   `Document` struct: Manages text using a `Rope` (via `ropey` crate) for efficient editing.
     -   `find`: Implements the search logic (forward/backward with wrap-around).
     -   `insert`/`delete`: Low-level text manipulation.
 -   **`src/row.rs`**: Represents a single line of text.

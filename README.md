@@ -33,6 +33,7 @@ A modal text editor inspired by Neovim, built with Rust.
 - **Rendering**: [ratatui](https://github.com/ratatui/ratatui) - A Rust TUI library.
 - **Input/Terminal**: [crossterm](https://github.com/crossterm-rs/crossterm) - Cross-platform terminal manipulation.
 - **Configuration**: [serde](https://serde.rs/) & [toml](https://toml.io) - For parsing the config file.
+- **Data Structure**: [ropey](https://github.com/cessen/ropey) - A Utf8 text rope for fast editing.
 
 ## How to Run
 
