@@ -1,6 +1,6 @@
 # Meow Text Editor - Comprehensive Documentation
 
-**Meow** is a lightweight, modal text editor built in Rust. Inspired by Vim, it offers a keyboard-centric code editing experience with a modern touch, including custom themes, mouse support, and system clipboard integration.
+**Meow** is a lightweight, modal text editor built in Rust. Inspired by Vim, it offers a keyboard-centric code editing experience with a modern touch, including custom themes, mouse support, basic auto-completion, and system clipboard integration.
 
 ---
 
@@ -44,6 +44,13 @@ Meow is a **modal** editor. This means keys behave differently depending on the 
 | **Visual** | `VISUAL` | Selecting text. | `v` or Mouse Drag | `Esc` |
 | **Command**| `COMMAND`| Saving/Quitting (`:w`, `:q`). | `:` | `Enter` or `Esc` |
 | **Search** | `SEARCH` | Finding text. | `/` | `Enter` or `Esc` |
+| **Auto-Complete** | (Popup) | Selecting suggestions. | Typing | `Esc` (dismiss), `Enter` (select) |
+
+### Auto-Completion
+When in **Insert Mode**, typing characters triggers a popup list of suggestions (based on keywords, types, and other text in the file).
+- **Navigation**: Use `Up` / `Down` arrows to cycle through suggestions.
+- **Selection**: Press `Tab` or `Enter` to insert the selected suggestion.
+- **Dismiss**: Press `Esc` to close the popup without selecting.
 
 ### Keybindings Cheat Sheet
 
@@ -56,6 +63,9 @@ Meow is a **modal** editor. This means keys behave differently depending on the 
 -   `x`: Delete character at cursor.
 -   `p`: Paste from clipboard.
 -   `Backspace`: Deletes characters. If cursor is at the start of a line, it merges the line with the previous one.
+-   **Auto-Complete**:
+    -   `Up` / `Down`: Navigate suggestions popup.
+    -   `Tab` / `Enter`: Insert selected suggestion.
 
 #### Visual Mode (Selection)
 -   `v`: Start Visual Mode.
