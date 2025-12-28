@@ -1,11 +1,3 @@
-[editor]
-tab_size = 4
-line_numbers = true
-mouse_support = true
-theme = "onedark"    # See available themes at the themes folder
-
-[theme]
-# (Optional) Overrides for specific colors if "theme" is set to "default" or left empty.
 background = "#0d1117"
 foreground = "#c9d1d9"
 cursor = "#58a6ff"
